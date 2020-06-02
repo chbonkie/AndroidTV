@@ -3,7 +3,6 @@ package org.jellyfin.androidtv.util.apiclient
 import org.jellyfin.androidtv.TvApp
 import org.jellyfin.androidtv.data.itemtypes.*
 import org.jellyfin.androidtv.data.querying.StdItemQuery
-import org.jellyfin.androidtv.model.itemtypes.*
 import org.jellyfin.apiclient.interaction.ApiClient
 import org.jellyfin.apiclient.interaction.Response
 import org.jellyfin.apiclient.model.dto.BaseItemDto
@@ -125,7 +124,8 @@ suspend fun ApiClient.getLocalTrailers(item: BaseItem): List<LocalTrailer>? = su
 	})
 }
 
-suspend fun ApiClient.getEpisodesOfSeason(episode: Episode): List<Episode>? = if (episode.seasonId != null) getEpisodesOfSeason(episode.seasonId) else null
+suspend fun ApiClient.getSisterEpisodes(episode: Episode): List<Episode>? = episode.seasonId?.let { getEpisodesOfSeason(episode.seasonId) }
+suspend fun ApiClient.getEpisodesOfSeason(season: Season): List<Episode>? = getEpisodesOfSeason(season.id)
 
 private suspend fun ApiClient.getEpisodesOfSeason(seasonId: String): List<Episode>? = suspendCoroutine { continuation ->
 	val query = StdItemQuery()
@@ -167,6 +167,25 @@ suspend fun ApiClient.getAlbumsForArtists(artists: Array<String>): List<Album>? 
 		}
 	})
 }
+
+suspend fun ApiClient.getSeasonsForSeries(series: Series): List<Season>? = suspendCoroutine { continuation ->
+	val query = SeasonQuery().apply {
+		fields = FIELDS_REQUIRED_FOR_LIFT
+		userId = currentUserId
+		seriesId = series.id
+	}
+
+	GetSeasonsAsync(query, object : Response<ItemsResult>() {
+		override fun onResponse(response: ItemsResult?) {
+			continuation.resume(response?.items?.map { it.liftToNewFormat() as Season }?.toList())
+		}
+
+		override fun onError(exception: Exception?) {
+			continuation.resume(null)
+		}
+	})
+}
+
 suspend fun ApiClient.getSongsForAlbum(albumId: String): List<Audio>? = suspendCoroutine { continuation ->
 	val query = ItemQuery().apply {
 		fields = FIELDS_REQUIRED_FOR_LIFT

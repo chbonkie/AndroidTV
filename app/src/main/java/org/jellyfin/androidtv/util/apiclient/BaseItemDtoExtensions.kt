@@ -4,7 +4,6 @@ import org.jellyfin.androidtv.data.itemtypes.*
 import org.jellyfin.androidtv.data.trailers.lifter.FirstMatchTrailerLifter
 import org.jellyfin.androidtv.data.trailers.lifter.GenericTrailerLifter
 import org.jellyfin.androidtv.data.trailers.lifter.YouTubeTrailerLifter
-import org.jellyfin.androidtv.model.itemtypes.*
 import org.jellyfin.apiclient.model.dto.BaseItemDto
 import org.jellyfin.apiclient.model.dto.BaseItemType
 
@@ -20,6 +19,8 @@ fun BaseItemDto.liftToNewFormat(): BaseItem {
 		BaseItemType.Movie -> Movie(this, multiTrailerLifter)
 
 		// TV
+		BaseItemType.Series -> Series(this)
+		BaseItemType.Season -> Season(this)
 		BaseItemType.Episode -> Episode(this)
 
 		// Video, like making-ofs and interviews

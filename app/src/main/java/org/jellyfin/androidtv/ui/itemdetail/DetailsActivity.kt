@@ -11,7 +11,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.data.itemtypes.*
-import org.jellyfin.androidtv.model.itemtypes.*
+import org.jellyfin.androidtv.details.fragments.SeriesDetailsFragment
 import org.jellyfin.androidtv.ui.itemdetail.fragments.AlbumDetailsFragment
 import org.jellyfin.androidtv.ui.itemdetail.fragments.ArtistDetailsFragment
 import org.jellyfin.androidtv.ui.itemdetail.fragments.EpisodeDetailsFragment
@@ -46,6 +46,8 @@ class DetailsActivity : FragmentActivity() {
 
 			fragment = when (item) {
 				// TV/Movie
+				is Series -> SeriesDetailsFragment(item)
+				is Season -> TODO("Season details are not yet implemented")
 				is Movie -> MovieDetailsFragment(item)
 				is Episode -> EpisodeDetailsFragment(item)
 				is Video -> TODO("Video details are not yet implemented")

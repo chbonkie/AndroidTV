@@ -9,7 +9,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.itemtypes.Episode
-import org.jellyfin.androidtv.details.actions.*
 import org.jellyfin.androidtv.ui.itemdetail.actions.*
 import org.jellyfin.androidtv.ui.itemdetail.presenters.ChapterInfoPresenter
 import org.jellyfin.androidtv.ui.itemdetail.presenters.ItemPresenter
@@ -18,7 +17,7 @@ import org.jellyfin.androidtv.ui.itemdetail.rows.DetailsOverviewRow
 import org.jellyfin.androidtv.ui.presentation.InfoCardPresenter
 import org.jellyfin.androidtv.util.ImageUtils
 import org.jellyfin.androidtv.util.addIfNotEmpty
-import org.jellyfin.androidtv.util.apiclient.getEpisodesOfSeason
+import org.jellyfin.androidtv.util.apiclient.getSisterEpisodes
 import org.jellyfin.androidtv.util.dp
 import org.jellyfin.apiclient.interaction.ApiClient
 import org.koin.android.ext.android.get
@@ -104,7 +103,7 @@ class EpisodeDetailsFragment(private val episode: Episode) : BaseDetailsFragment
 		// Get additional information asynchronously
 		awaitAll(
 			async {
-				get<ApiClient>().getEpisodesOfSeason(episode)?.let { episodes ->
+				get<ApiClient>().getSisterEpisodes(episode)?.let { episodes ->
 					val adapter = (moreFromThisSeason.adapter as ArrayObjectAdapter)
 					adapter.apply { episodes.forEach(::add) }
 				}
