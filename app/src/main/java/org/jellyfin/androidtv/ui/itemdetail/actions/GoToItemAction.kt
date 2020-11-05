@@ -1,11 +1,11 @@
-package org.jellyfin.androidtv.details.actions
+package org.jellyfin.androidtv.ui.itemdetail.actions
 
 import android.content.Context
 import android.view.View
 import androidx.lifecycle.MutableLiveData
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.details.DetailsActivity
-import org.jellyfin.androidtv.model.itemtypes.BaseItem
+import org.jellyfin.androidtv.data.itemtypes.BaseItem
+import org.jellyfin.androidtv.ui.itemdetail.DetailsActivity
 
 class GoToItemAction(private val context: Context, label: String, private val targetId: String) : Action {
 	constructor(context: Context, label: String, target: BaseItem) : this(context, label, target.id)

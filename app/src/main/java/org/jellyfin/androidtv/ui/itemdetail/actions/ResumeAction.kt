@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.actions
+package org.jellyfin.androidtv.ui.itemdetail.actions
 
 import android.content.Context
 import android.util.Log
@@ -7,8 +7,9 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.model.itemtypes.PlayableItem
+import org.jellyfin.androidtv.data.itemtypes.PlayableItem
+import org.jellyfin.androidtv.preference.UserPreferences
+import org.koin.core.get
 
 private const val LOG_TAG = "ResumeAction"
 
@@ -26,7 +27,7 @@ class ResumeAction(private val context: Context, val item: LiveData<out Playable
 		Log.i(LOG_TAG, "Resume Clicked!")
 
 		val itemValue = item.value ?: return
-		val position = itemValue.playbackPositionTicks / 10000 - TvApp.getApplication().resumePreroll
+		val position = itemValue.playbackPositionTicks / 10000 - get<UserPreferences>()[UserPreferences.resumeSubtractDuration].toInt() * 1000
 		playItem(context, itemValue, position, false)
 	}
 }

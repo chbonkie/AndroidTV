@@ -1,7 +1,7 @@
-package org.jellyfin.androidtv.model.itemtypes
+package org.jellyfin.androidtv.data.itemtypes
 
-import org.jellyfin.androidtv.model.trailers.external.ExternalTrailer
-import org.jellyfin.androidtv.model.trailers.lifter.BaseTrailerLifter
+import org.jellyfin.androidtv.data.trailers.external.ExternalTrailer
+import org.jellyfin.androidtv.data.trailers.lifter.BaseTrailerLifter
 import org.jellyfin.apiclient.model.dto.BaseItemDto
 import org.jellyfin.apiclient.model.dto.GenreDto
 import org.jellyfin.apiclient.model.dto.NameIdPair

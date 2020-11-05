@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.playback.MediaManager
+import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.util.apiclient.PlaybackHelperKt
 import org.jellyfin.apiclient.model.dto.BaseItemDto
 import org.jellyfin.apiclient.model.dto.BaseItemType

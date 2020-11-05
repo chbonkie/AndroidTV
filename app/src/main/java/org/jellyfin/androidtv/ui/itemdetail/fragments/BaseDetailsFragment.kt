@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.fragments
+package org.jellyfin.androidtv.ui.itemdetail.fragments
 
 import android.os.Bundle
 import androidx.annotation.CallSuper
@@ -7,12 +7,12 @@ import androidx.leanback.widget.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import org.jellyfin.androidtv.base.IItemClickListener
-import org.jellyfin.androidtv.details.presenters.DetailsOverviewPresenter
-import org.jellyfin.androidtv.details.presenters.VerticalListRowPresenter
-import org.jellyfin.androidtv.details.rows.DetailsOverviewRow
-import org.jellyfin.androidtv.details.rows.VerticalListRow
-import org.jellyfin.androidtv.model.itemtypes.BaseItem
+import org.jellyfin.androidtv.data.itemtypes.BaseItem
+import org.jellyfin.androidtv.ui.itemdetail.presenters.DetailsOverviewPresenter
+import org.jellyfin.androidtv.ui.itemdetail.presenters.VerticalListRowPresenter
+import org.jellyfin.androidtv.ui.itemdetail.rows.DetailsOverviewRow
+import org.jellyfin.androidtv.ui.itemdetail.rows.VerticalListRow
+import org.jellyfin.androidtv.ui.shared.IItemClickListener
 
 abstract class BaseDetailsFragment<T : BaseItem>(private val initialItem: T) : RowsSupportFragment(), OnItemViewClickedListener {
 	protected val rowSelector by lazy { ClassPresenterSelector() }

@@ -1,8 +1,9 @@
 package org.jellyfin.androidtv.util.apiclient
 
 import org.jellyfin.androidtv.TvApp
+import org.jellyfin.androidtv.data.itemtypes.*
+import org.jellyfin.androidtv.data.querying.StdItemQuery
 import org.jellyfin.androidtv.model.itemtypes.*
-import org.jellyfin.androidtv.querying.StdItemQuery
 import org.jellyfin.apiclient.interaction.ApiClient
 import org.jellyfin.apiclient.interaction.Response
 import org.jellyfin.apiclient.model.dto.BaseItemDto

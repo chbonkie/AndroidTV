@@ -1,9 +1,10 @@
 package org.jellyfin.androidtv.util.apiclient
 
+import org.jellyfin.androidtv.data.itemtypes.*
+import org.jellyfin.androidtv.data.trailers.lifter.FirstMatchTrailerLifter
+import org.jellyfin.androidtv.data.trailers.lifter.GenericTrailerLifter
+import org.jellyfin.androidtv.data.trailers.lifter.YouTubeTrailerLifter
 import org.jellyfin.androidtv.model.itemtypes.*
-import org.jellyfin.androidtv.model.trailers.lifter.FirstMatchTrailerLifter
-import org.jellyfin.androidtv.model.trailers.lifter.GenericTrailerLifter
-import org.jellyfin.androidtv.model.trailers.lifter.YouTubeTrailerLifter
 import org.jellyfin.apiclient.model.dto.BaseItemDto
 import org.jellyfin.apiclient.model.dto.BaseItemType
 

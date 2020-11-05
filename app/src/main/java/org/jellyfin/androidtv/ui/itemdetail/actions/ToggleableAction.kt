@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.actions
+package org.jellyfin.androidtv.ui.itemdetail.actions
 
 import androidx.lifecycle.LiveData
 

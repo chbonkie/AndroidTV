@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details
+package org.jellyfin.androidtv.ui.itemdetail
 
 import android.content.Context
 import android.content.Intent
@@ -10,14 +10,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.details.fragments.AlbumDetailsFragment
-import org.jellyfin.androidtv.details.fragments.ArtistDetailsFragment
-import org.jellyfin.androidtv.details.fragments.EpisodeDetailsFragment
-import org.jellyfin.androidtv.details.fragments.MovieDetailsFragment
+import org.jellyfin.androidtv.data.itemtypes.*
 import org.jellyfin.androidtv.model.itemtypes.*
+import org.jellyfin.androidtv.ui.itemdetail.fragments.AlbumDetailsFragment
+import org.jellyfin.androidtv.ui.itemdetail.fragments.ArtistDetailsFragment
+import org.jellyfin.androidtv.ui.itemdetail.fragments.EpisodeDetailsFragment
+import org.jellyfin.androidtv.ui.itemdetail.fragments.MovieDetailsFragment
 import org.jellyfin.androidtv.util.apiclient.getItem
 import org.jellyfin.androidtv.util.apiclient.liftToNewFormat
+import org.jellyfin.apiclient.interaction.ApiClient
+import org.koin.android.ext.android.get
 
 private const val LOG_TAG = "DetailsActivity"
 
@@ -60,7 +62,7 @@ class DetailsActivity : FragmentActivity() {
 	}
 
 	private suspend fun getBaseItemDtoForID(id: String) = withContext(Dispatchers.IO) {
-		TvApp.getApplication().apiClient.getItem(id)
+		get<ApiClient>().getItem(id)
 	}
 
 	companion object {

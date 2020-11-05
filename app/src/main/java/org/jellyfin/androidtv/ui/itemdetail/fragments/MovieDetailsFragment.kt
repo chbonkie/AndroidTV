@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.fragments
+package org.jellyfin.androidtv.ui.itemdetail.fragments
 
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.ClassPresenterSelector
@@ -9,25 +9,27 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
-import org.jellyfin.androidtv.TvApp
+import org.jellyfin.androidtv.data.itemtypes.LocalTrailer
+import org.jellyfin.androidtv.data.itemtypes.Movie
+import org.jellyfin.androidtv.data.trailers.external.ExternalTrailer
+import org.jellyfin.androidtv.data.trailers.external.YouTubeTrailer
 import org.jellyfin.androidtv.details.actions.*
-import org.jellyfin.androidtv.details.presenters.ChapterInfoPresenter
-import org.jellyfin.androidtv.details.presenters.ItemPresenter
-import org.jellyfin.androidtv.details.presenters.PersonPresenter
-import org.jellyfin.androidtv.details.presenters.trailers.ExternalTrailerPresenter
-import org.jellyfin.androidtv.details.presenters.trailers.YouTubeTrailerPresenter
-import org.jellyfin.androidtv.details.rows.DetailsOverviewRow
-import org.jellyfin.androidtv.model.itemtypes.LocalTrailer
-import org.jellyfin.androidtv.model.itemtypes.Movie
-import org.jellyfin.androidtv.model.trailers.external.ExternalTrailer
-import org.jellyfin.androidtv.model.trailers.external.YouTubeTrailer
-import org.jellyfin.androidtv.presentation.InfoCardPresenter
+import org.jellyfin.androidtv.ui.itemdetail.actions.*
+import org.jellyfin.androidtv.ui.itemdetail.presenters.ChapterInfoPresenter
+import org.jellyfin.androidtv.ui.itemdetail.presenters.ItemPresenter
+import org.jellyfin.androidtv.ui.itemdetail.presenters.PersonPresenter
+import org.jellyfin.androidtv.ui.itemdetail.presenters.trailers.ExternalTrailerPresenter
+import org.jellyfin.androidtv.ui.itemdetail.presenters.trailers.YouTubeTrailerPresenter
+import org.jellyfin.androidtv.ui.itemdetail.rows.DetailsOverviewRow
+import org.jellyfin.androidtv.ui.presentation.InfoCardPresenter
 import org.jellyfin.androidtv.util.ImageUtils
 import org.jellyfin.androidtv.util.addIfNotEmpty
 import org.jellyfin.androidtv.util.apiclient.getLocalTrailers
 import org.jellyfin.androidtv.util.apiclient.getSimilarItems
 import org.jellyfin.androidtv.util.apiclient.getSpecialFeatures
 import org.jellyfin.androidtv.util.dp
+import org.jellyfin.apiclient.interaction.ApiClient
+import org.koin.android.ext.android.get
 
 class MovieDetailsFragment(private val movie: Movie) : BaseDetailsFragment<Movie>(movie) {
 	// Action definitions
@@ -89,16 +91,16 @@ class MovieDetailsFragment(private val movie: Movie) : BaseDetailsFragment<Movie
 		// Get additional information asynchronously
 		awaitAll(
 			async {
-				val specials = TvApp.getApplication().apiClient.getSpecialFeatures(movie).orEmpty()
+				val specials = get<ApiClient>().getSpecialFeatures(movie).orEmpty()
 				(specialsRow.adapter as ArrayObjectAdapter).apply { specials.forEach(::add) }
 			},
 			async {
 				//todo filter on server side?
-				val relatedItems = TvApp.getApplication().apiClient.getSimilarItems(movie).orEmpty().filterIsInstance<Movie>()
+				val relatedItems = get<ApiClient>().getSimilarItems(movie).orEmpty().filterIsInstance<Movie>()
 				(relatedItemsRow.adapter as ArrayObjectAdapter).apply { relatedItems.forEach(::add) }
 			},
 			async {
-				val trailers = TvApp.getApplication().apiClient.getLocalTrailers(movie).orEmpty()
+				val trailers = get<ApiClient>().getLocalTrailers(movie).orEmpty()
 				(trailersRow.adapter as ArrayObjectAdapter).apply {
 					movie.externalTrailers.forEach(::add)
 					trailers.forEach(::add)

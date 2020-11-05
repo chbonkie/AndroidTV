@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.fragments
+package org.jellyfin.androidtv.ui.itemdetail.fragments
 
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.ClassPresenterSelector
@@ -8,18 +8,19 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.details.actions.InstantMixAction
-import org.jellyfin.androidtv.details.actions.PlayFromBeginningAction
-import org.jellyfin.androidtv.details.actions.ShuffleAction
-import org.jellyfin.androidtv.details.actions.ToggleFavoriteAction
-import org.jellyfin.androidtv.details.presenters.ItemPresenter
-import org.jellyfin.androidtv.details.rows.DetailsOverviewRow
-import org.jellyfin.androidtv.model.itemtypes.Artist
+import org.jellyfin.androidtv.data.itemtypes.Artist
+import org.jellyfin.androidtv.ui.itemdetail.actions.InstantMixAction
+import org.jellyfin.androidtv.ui.itemdetail.actions.PlayFromBeginningAction
+import org.jellyfin.androidtv.ui.itemdetail.actions.ShuffleAction
+import org.jellyfin.androidtv.ui.itemdetail.actions.ToggleFavoriteAction
+import org.jellyfin.androidtv.ui.itemdetail.presenters.ItemPresenter
+import org.jellyfin.androidtv.ui.itemdetail.rows.DetailsOverviewRow
 import org.jellyfin.androidtv.util.addIfNotEmpty
 import org.jellyfin.androidtv.util.apiclient.getAlbumsForArtist
 import org.jellyfin.androidtv.util.apiclient.getSimilarItems
 import org.jellyfin.androidtv.util.dp
+import org.jellyfin.apiclient.interaction.ApiClient
+import org.koin.android.ext.android.get
 
 class ArtistDetailsFragment(private val artist: Artist) : BaseDetailsFragment<Artist>(artist) {
 	// Action definitions
@@ -57,11 +58,11 @@ class ArtistDetailsFragment(private val artist: Artist) : BaseDetailsFragment<Ar
 		// Get additional information asynchronously
 		awaitAll(
 			async {
-				val albums = TvApp.getApplication().apiClient.getAlbumsForArtist(artist).orEmpty()
+				val albums = get<ApiClient>().getAlbumsForArtist(artist).orEmpty()
 				(albumsRow.adapter as ArrayObjectAdapter).apply { albums.forEach(::add) }
 			},
 			async {
-				val relatedItems = TvApp.getApplication().apiClient.getSimilarItems(artist).orEmpty()
+				val relatedItems = get<ApiClient>().getSimilarItems(artist).orEmpty()
 				(relatedItemsRow.adapter as ArrayObjectAdapter).apply { relatedItems.forEach(::add) }
 			}
 		)

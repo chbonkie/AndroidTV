@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.actions
+package org.jellyfin.androidtv.ui.itemdetail.actions
 
 import android.content.Context
 import android.util.Log
@@ -6,7 +6,7 @@ import android.view.View
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.model.itemtypes.BaseItem
+import org.jellyfin.androidtv.data.itemtypes.BaseItem
 
 private const val LOG_TAG = "PlayFromBeginningAction"
 

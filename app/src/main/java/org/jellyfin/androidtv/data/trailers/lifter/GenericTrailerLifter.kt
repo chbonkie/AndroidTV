@@ -1,6 +1,6 @@
-package org.jellyfin.androidtv.model.trailers.lifter
+package org.jellyfin.androidtv.data.trailers.lifter
 
-import org.jellyfin.androidtv.model.trailers.external.GenericTrailer
+import org.jellyfin.androidtv.data.trailers.external.GenericTrailer
 import org.jellyfin.apiclient.model.entities.MediaUrl
 
 class GenericTrailerLifter : BaseTrailerLifter() {

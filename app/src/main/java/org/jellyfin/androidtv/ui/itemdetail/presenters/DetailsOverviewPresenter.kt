@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.presenters
+package org.jellyfin.androidtv.ui.itemdetail.presenters
 
 import android.content.Context
 import android.text.SpannableStringBuilder
@@ -16,14 +16,14 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import kotlinx.android.synthetic.main.row_details_description.view.*
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.details.GenreAdapter
-import org.jellyfin.androidtv.details.actions.ActionAdapter
-import org.jellyfin.androidtv.details.rows.DetailsOverviewRow
-import org.jellyfin.androidtv.model.itemtypes.Episode
-import org.jellyfin.androidtv.model.itemtypes.Movie
-import org.jellyfin.androidtv.model.itemtypes.PlayableItem
-import org.jellyfin.androidtv.model.itemtypes.Ratable
+import org.jellyfin.androidtv.data.itemtypes.Episode
+import org.jellyfin.androidtv.data.itemtypes.Movie
+import org.jellyfin.androidtv.data.itemtypes.PlayableItem
+import org.jellyfin.androidtv.data.itemtypes.Ratable
 import org.jellyfin.androidtv.ui.RecyclerViewSpacingDecoration
+import org.jellyfin.androidtv.ui.itemdetail.GenreAdapter
+import org.jellyfin.androidtv.ui.itemdetail.actions.ActionAdapter
+import org.jellyfin.androidtv.ui.itemdetail.rows.DetailsOverviewRow
 import org.jellyfin.androidtv.ui.widget.Rating
 import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.androidtv.util.dp

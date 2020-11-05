@@ -15,7 +15,7 @@ import androidx.fragment.app.FragmentActivity;
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.ui.browsing.MainActivity;
-import org.jellyfin.androidtv.ui.itemdetail.FullDetailsActivity;
+import org.jellyfin.androidtv.ui.itemdetail.DetailsActivity;
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher;
 import org.jellyfin.androidtv.ui.playback.MediaManager;
 import org.jellyfin.androidtv.util.Utils;
@@ -86,9 +86,9 @@ public class StartupActivity extends FragmentActivity {
                 });
             } else {
                 //Can just go right into details
-                Intent detailsIntent = new Intent(this, FullDetailsActivity.class);
-                detailsIntent.putExtra("ItemId", getIntent().getStringExtra("ItemId"));
-                startActivity(detailsIntent);
+                Intent intent = new Intent(this, DetailsActivity.class);
+                intent.putExtra(DetailsActivity.EXTRA_ITEM_ID, getIntent().getStringExtra("ItemId"));
+                startActivity(intent);
 
                 finish();
             }

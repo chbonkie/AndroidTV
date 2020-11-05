@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.fragments
+package org.jellyfin.androidtv.ui.itemdetail.fragments
 
 import androidx.leanback.widget.ArrayObjectAdapter
 import androidx.leanback.widget.ClassPresenterSelector
@@ -8,18 +8,20 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.TvApp
+import org.jellyfin.androidtv.data.itemtypes.Episode
 import org.jellyfin.androidtv.details.actions.*
-import org.jellyfin.androidtv.details.presenters.ChapterInfoPresenter
-import org.jellyfin.androidtv.details.presenters.ItemPresenter
-import org.jellyfin.androidtv.details.presenters.PersonPresenter
-import org.jellyfin.androidtv.details.rows.DetailsOverviewRow
-import org.jellyfin.androidtv.model.itemtypes.Episode
-import org.jellyfin.androidtv.presentation.InfoCardPresenter
+import org.jellyfin.androidtv.ui.itemdetail.actions.*
+import org.jellyfin.androidtv.ui.itemdetail.presenters.ChapterInfoPresenter
+import org.jellyfin.androidtv.ui.itemdetail.presenters.ItemPresenter
+import org.jellyfin.androidtv.ui.itemdetail.presenters.PersonPresenter
+import org.jellyfin.androidtv.ui.itemdetail.rows.DetailsOverviewRow
+import org.jellyfin.androidtv.ui.presentation.InfoCardPresenter
 import org.jellyfin.androidtv.util.ImageUtils
 import org.jellyfin.androidtv.util.addIfNotEmpty
 import org.jellyfin.androidtv.util.apiclient.getEpisodesOfSeason
 import org.jellyfin.androidtv.util.dp
+import org.jellyfin.apiclient.interaction.ApiClient
+import org.koin.android.ext.android.get
 
 class EpisodeDetailsFragment(private val episode: Episode) : BaseDetailsFragment<Episode>(episode) {
 	// Action definitions
@@ -102,7 +104,7 @@ class EpisodeDetailsFragment(private val episode: Episode) : BaseDetailsFragment
 		// Get additional information asynchronously
 		awaitAll(
 			async {
-				TvApp.getApplication().apiClient.getEpisodesOfSeason(episode)?.let { episodes ->
+				get<ApiClient>().getEpisodesOfSeason(episode)?.let { episodes ->
 					val adapter = (moreFromThisSeason.adapter as ArrayObjectAdapter)
 					adapter.apply { episodes.forEach(::add) }
 				}

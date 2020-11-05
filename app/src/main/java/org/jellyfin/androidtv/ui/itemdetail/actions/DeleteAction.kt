@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.actions
+package org.jellyfin.androidtv.ui.itemdetail.actions
 
 import android.app.AlertDialog
 import android.content.Context
@@ -10,9 +10,11 @@ import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.model.itemtypes.BaseItem
+import org.jellyfin.androidtv.data.itemtypes.BaseItem
 import org.jellyfin.androidtv.util.DelayedMessage
+import org.jellyfin.apiclient.interaction.ApiClient
 import org.jellyfin.apiclient.interaction.EmptyResponse
+import org.koin.core.get
 import timber.log.Timber
 
 class DeleteAction(private val context: Context, private val item: LiveData<out BaseItem>, private val onItemDeleted: () -> Unit) : Action {
@@ -32,7 +34,7 @@ class DeleteAction(private val context: Context, private val item: LiveData<out 
 			setPositiveButton(R.string.lbl_delete) { _, _ ->
 				val msg = DelayedMessage(context, 150)
 				//todo coroutine version for api call
-				TvApp.getApplication().apiClient.DeleteItem(itemValue.id, object : EmptyResponse() {
+				get<ApiClient>().DeleteItem(itemValue.id, object : EmptyResponse() {
 					override fun onResponse() {
 						msg.Cancel()
 						Toast.makeText(context, context.getString(R.string.lbl_item_deleted, itemValue.title), Toast.LENGTH_LONG).show()

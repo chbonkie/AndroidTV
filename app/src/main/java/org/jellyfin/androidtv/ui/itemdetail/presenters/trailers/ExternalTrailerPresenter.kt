@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.presenters.trailers
+package org.jellyfin.androidtv.ui.itemdetail.presenters.trailers
 
 import android.content.Context
 import android.content.Intent
@@ -8,9 +8,9 @@ import android.widget.Toast
 import androidx.appcompat.view.ContextThemeWrapper
 import androidx.leanback.widget.Presenter
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.base.IItemClickListener
-import org.jellyfin.androidtv.model.trailers.external.ExternalTrailer
+import org.jellyfin.androidtv.data.trailers.external.ExternalTrailer
 import org.jellyfin.androidtv.ui.MultiBadgeImageCardView
+import org.jellyfin.androidtv.ui.shared.IItemClickListener
 import org.jellyfin.androidtv.util.ImageUtils
 
 open class ExternalTrailerPresenter(private val context: Context, private val imageHeight: Int) : Presenter(), IItemClickListener {

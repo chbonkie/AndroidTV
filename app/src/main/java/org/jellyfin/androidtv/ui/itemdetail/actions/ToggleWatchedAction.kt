@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.actions
+package org.jellyfin.androidtv.ui.itemdetail.actions
 
 import android.content.Context
 import android.view.View
@@ -6,9 +6,11 @@ import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.model.itemtypes.PlayableItem
+import org.jellyfin.androidtv.data.itemtypes.PlayableItem
 import org.jellyfin.androidtv.util.apiclient.markPlayed
 import org.jellyfin.androidtv.util.apiclient.markUnplayed
+import org.jellyfin.apiclient.interaction.ApiClient
+import org.koin.core.get
 
 class ToggleWatchedAction(context: Context, val item: MutableLiveData<out PlayableItem>) : ToggleableAction {
 	override val visible = MutableLiveData(true)
@@ -23,8 +25,8 @@ class ToggleWatchedAction(context: Context, val item: MutableLiveData<out Playab
 		val application = TvApp.getApplication()
 
 		//todo catch exceptions (show toast?)
-		val response = if (itemValue.played) application.apiClient.markUnplayed(itemValue.id, application.currentUser.id)
-		else application.apiClient.markPlayed(itemValue.id, application.currentUser.id, null)
+		val response = if (itemValue.played) get<ApiClient>().markUnplayed(itemValue.id, application.currentUser.id)
+		else get<ApiClient>().markPlayed(itemValue.id, application.currentUser.id, null)
 
 		response?.let {
 			itemValue.playbackPositionTicks = it.playbackPositionTicks

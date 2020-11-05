@@ -1,7 +1,7 @@
-package org.jellyfin.androidtv.model.trailers.lifter
+package org.jellyfin.androidtv.data.trailers.lifter
 
 import android.util.Log
-import org.jellyfin.androidtv.model.trailers.external.YouTubeTrailer
+import org.jellyfin.androidtv.data.trailers.external.YouTubeTrailer
 import org.jellyfin.apiclient.model.entities.MediaUrl
 import java.net.URL
 

@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.presenters
+package org.jellyfin.androidtv.ui.itemdetail.presenters
 
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -11,15 +11,17 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.model.itemtypes.Audio
-import org.jellyfin.androidtv.playback.MediaManager
+import org.jellyfin.androidtv.data.itemtypes.Audio
+import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.androidtv.util.Utils
 import org.jellyfin.androidtv.util.apiclient.PlaybackHelper
 import org.jellyfin.androidtv.util.apiclient.getItem
+import org.jellyfin.apiclient.interaction.ApiClient
+import org.koin.core.KoinComponent
+import org.koin.core.get
 
-class SongPresenter : Presenter() {
+class SongPresenter : Presenter(), KoinComponent {
 	override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
 		val view = LayoutInflater
 			.from(parent.context)
@@ -49,7 +51,7 @@ class SongPresenter : Presenter() {
 		Utils.createPopupMenu(row.context, row, Gravity.END).apply {
 			menu.add(R.string.lbl_play).setOnMenuItemClickListener {
 				GlobalScope.launch(Dispatchers.IO) {
-					val baseItem = TvApp.getApplication().apiClient.getItem(item.id)!!
+					val baseItem = get<ApiClient>().getItem(item.id)!!
 
 					withContext(Dispatchers.Main) { MediaManager.playNow(baseItem) }
 				}
@@ -59,7 +61,7 @@ class SongPresenter : Presenter() {
 
 			menu.add(R.string.lbl_add_to_queue).setOnMenuItemClickListener {
 				GlobalScope.launch(Dispatchers.IO) {
-					val baseItem = TvApp.getApplication().apiClient.getItem(item.id)!!
+					val baseItem = get<ApiClient>().getItem(item.id)!!
 
 					withContext(Dispatchers.Main) { MediaManager.queueAudioItem(baseItem) }
 				}

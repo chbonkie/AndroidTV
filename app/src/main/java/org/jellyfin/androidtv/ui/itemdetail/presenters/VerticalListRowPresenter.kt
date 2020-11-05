@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.presenters
+package org.jellyfin.androidtv.ui.itemdetail.presenters
 
 import android.view.LayoutInflater
 import android.view.View
@@ -8,7 +8,7 @@ import androidx.leanback.widget.RowPresenter
 import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.android.synthetic.main.row_vertical_list.view.*
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.details.rows.VerticalListRow
+import org.jellyfin.androidtv.ui.itemdetail.rows.VerticalListRow
 
 class VerticalListRowPresenter : RowPresenter() {
 	init {

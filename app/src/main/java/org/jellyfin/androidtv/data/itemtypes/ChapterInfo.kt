@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.model.itemtypes
+package org.jellyfin.androidtv.data.itemtypes
 
 import org.jellyfin.apiclient.model.dto.ChapterInfoDto
 import org.jellyfin.apiclient.model.entities.ImageType

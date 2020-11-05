@@ -6,7 +6,7 @@ import android.view.View
 import android.widget.FrameLayout
 import kotlinx.android.synthetic.main.badge_watched.view.*
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.model.itemtypes.PlayableItem
+import org.jellyfin.androidtv.data.itemtypes.PlayableItem
 
 
 class WatchedBadge(context: Context, val item: PlayableItem? = null) : FrameLayout(context) {

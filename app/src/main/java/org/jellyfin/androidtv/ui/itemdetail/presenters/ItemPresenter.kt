@@ -1,23 +1,24 @@
-package org.jellyfin.androidtv.details.presenters
+package org.jellyfin.androidtv.ui.itemdetail.presenters
 
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.BitmapDrawable
 import android.view.ViewGroup
 import androidx.appcompat.view.ContextThemeWrapper
+import androidx.core.content.ContextCompat
 import androidx.leanback.widget.Presenter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.base.IItemClickListener
-import org.jellyfin.androidtv.details.DetailsActivity
-import org.jellyfin.androidtv.model.itemtypes.BaseItem
-import org.jellyfin.androidtv.model.itemtypes.PlayableItem
+import org.jellyfin.androidtv.data.itemtypes.BaseItem
+import org.jellyfin.androidtv.data.itemtypes.PlayableItem
 import org.jellyfin.androidtv.ui.FavoriteBadge
 import org.jellyfin.androidtv.ui.MultiBadgeImageCardView
 import org.jellyfin.androidtv.ui.WatchedBadge
+import org.jellyfin.androidtv.ui.itemdetail.DetailsActivity
+import org.jellyfin.androidtv.ui.shared.IItemClickListener
 
 
 class ItemPresenter(private val context: Context,
@@ -46,7 +47,7 @@ class ItemPresenter(private val context: Context,
 			isFocusable = true
 			isFocusableInTouchMode = true
 			setMainImageDimensions(imageWidth, imageHeight)
-			mainImageDrawable = TvApp.getApplication().getDrawableCompat(R.drawable.tile_port_video)
+			mainImageDrawable =  ContextCompat.getDrawable(context, R.drawable.tile_port_video)
 
 			if (baseItem is PlayableItem)
 				setBadge(MultiBadgeImageCardView.BadgeLocation.TOP_RIGHT, WatchedBadge(context, baseItem))

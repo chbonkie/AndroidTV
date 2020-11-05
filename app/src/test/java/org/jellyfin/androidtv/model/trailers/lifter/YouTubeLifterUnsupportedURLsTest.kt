@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.model.trailers.lifter
 
+import org.jellyfin.androidtv.data.trailers.lifter.YouTubeTrailerLifter
 import org.jellyfin.apiclient.model.entities.MediaUrl
 import org.junit.Assert
 import org.junit.Test

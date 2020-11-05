@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details.actions
+package org.jellyfin.androidtv.ui.itemdetail.actions
 
 import android.content.Context
 import android.graphics.drawable.Drawable
@@ -8,8 +8,10 @@ import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.model.itemtypes.BaseItem
+import org.jellyfin.androidtv.data.itemtypes.BaseItem
 import org.jellyfin.androidtv.util.apiclient.updateFavoriteStatus
+import org.jellyfin.apiclient.interaction.ApiClient
+import org.koin.core.get
 
 class ToggleFavoriteAction(val context: Context, val item: MutableLiveData<out BaseItem>) : ToggleableAction {
 	override val visible: LiveData<Boolean> = MutableLiveData(true)
@@ -24,7 +26,7 @@ class ToggleFavoriteAction(val context: Context, val item: MutableLiveData<out B
 		val application = TvApp.getApplication()
 
 		//todo catch exceptions (show toast?)
-		application.apiClient.updateFavoriteStatus(
+		get<ApiClient>().updateFavoriteStatus(
 			itemValue.id,
 			application.currentUser.id,
 			!itemValue.favorite

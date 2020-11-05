@@ -12,7 +12,7 @@ import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.data.model.LogonCredentials;
 import org.jellyfin.androidtv.ui.browsing.MainActivity;
-import org.jellyfin.androidtv.ui.itemdetail.FullDetailsActivity;
+import org.jellyfin.androidtv.ui.itemdetail.DetailsActivity;
 import org.jellyfin.androidtv.ui.shared.KeyboardFocusChangeListener;
 import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.apiclient.interaction.ApiClient;

@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.model.itemtypes
+package org.jellyfin.androidtv.data.itemtypes
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -7,10 +7,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.jellyfin.androidtv.TvApp
+import org.jellyfin.apiclient.interaction.ApiClient
 import org.jellyfin.apiclient.model.dto.BaseItemDto
 import org.jellyfin.apiclient.model.dto.ImageOptions
 import org.jellyfin.apiclient.model.entities.ImageType
+import org.koin.core.KoinComponent
+import org.koin.core.get
 import timber.log.Timber
 
 class ImageCollection(original: BaseItemDto) {
@@ -25,9 +27,9 @@ class ImageCollection(original: BaseItemDto) {
 			private val type: ImageType,
 			private val tag: String?,
 			private val index: Int? = null
-	) {
+	) : KoinComponent {
 		val url: String by lazy {
-			TvApp.getApplication().apiClient.GetImageUrl(itemId, ImageOptions().also {
+			get<ApiClient>().GetImageUrl(itemId, ImageOptions().also {
 				it.imageType = type
 				it.tag = tag
 				it.imageIndex = index

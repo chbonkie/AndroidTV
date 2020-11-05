@@ -1,10 +1,11 @@
-package org.jellyfin.androidtv.details.presenters
+package org.jellyfin.androidtv.ui.itemdetail.presenters
 
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.BitmapDrawable
 import android.view.ViewGroup
 import androidx.appcompat.view.ContextThemeWrapper
+import androidx.core.content.ContextCompat
 import androidx.leanback.widget.ImageCardView
 import androidx.leanback.widget.Presenter
 import kotlinx.coroutines.Dispatchers
@@ -12,9 +13,9 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.base.IItemClickListener
-import org.jellyfin.androidtv.details.DetailsActivity
-import org.jellyfin.androidtv.model.itemtypes.BriefPersonData
+import org.jellyfin.androidtv.data.itemtypes.BriefPersonData
+import org.jellyfin.androidtv.ui.itemdetail.DetailsActivity
+import org.jellyfin.androidtv.ui.shared.IItemClickListener
 import org.jellyfin.androidtv.util.dp
 
 
@@ -42,7 +43,7 @@ class PersonPresenter(private val context: Context) : Presenter(), IItemClickLis
 		cardView.isFocusable = true
 		cardView.isFocusableInTouchMode = true
 		cardView.setMainImageDimensions(100.dp, 150.dp)
-		cardView.mainImage = TvApp.getApplication().getDrawableCompat(R.drawable.tile_port_person)
+		cardView.mainImage = ContextCompat.getDrawable(context, R.drawable.tile_port_person)
 
 		if (person.primaryImage != null) {
 			GlobalScope.launch(Dispatchers.Main) {

@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.details
+package org.jellyfin.androidtv.ui.itemdetail
 
 import android.view.LayoutInflater
 import android.view.View

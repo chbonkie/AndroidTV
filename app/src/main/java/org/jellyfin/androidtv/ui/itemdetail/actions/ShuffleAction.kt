@@ -1,11 +1,11 @@
-package org.jellyfin.androidtv.details.actions
+package org.jellyfin.androidtv.ui.itemdetail.actions
 
 import android.content.Context
 import android.view.View
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.model.itemtypes.BaseItem
+import org.jellyfin.androidtv.data.itemtypes.BaseItem
 
 class ShuffleAction(private val context: Context, val item: LiveData<out BaseItem>) : PlaybackAction() {
 	override val visible = MutableLiveData(true)

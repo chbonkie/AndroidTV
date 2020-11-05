@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.model.itemtypes
+package org.jellyfin.androidtv.data.itemtypes
 
 import kotlin.reflect.KProperty
 
