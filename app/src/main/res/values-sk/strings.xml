@@ -364,4 +364,16 @@
     <string name="grid_direction_horizontal">Horizontálne</string>
     <string name="grid_direction">Smer mriežky</string>
     <string name="pref_device_model">Model zariadenia</string>
+    <string name="lbl_Reset">Obnoviť</string>
+    <string name="pref_button_remapping_description">Stlačte akékoľvek tlačidlo na TV ovládači pre priradenie</string>
+    <string name="pref_subtitle_track_button">Tlačidlo titulkovej stopy</string>
+    <string name="pref_audio_track_button">Tlačidlo zvukovej stopy</string>
+    <string name="pref_button_remapping_category">Zmena mapovania kláves</string>
+    <string name="lbl_unknown_key">Neznámy (%1s)</string>
+    <string name="bitrate_kbit">%1$,.0f Kbit/s</string>
+    <string name="bitrate_mbit">%1$,.0f Mbit/s</string>
+    <string name="bitrate_auto">Automaticky</string>
+    <string name="no_player">Žiadny prehrávač</string>
+    <string name="mark_watched_message">Zdá sa, že položka nebola prehratá celá. Aj tak označiť ako pozreté\?</string>
+    <string name="mark_watched">Označiť ako pozreté</string>
 </resources>

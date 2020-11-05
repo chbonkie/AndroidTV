@@ -14,13 +14,16 @@ import com.bumptech.glide.Glide;
 
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.playback.AudioEventListener;
-import org.jellyfin.androidtv.playback.AudioNowPlayingActivity;
-import org.jellyfin.androidtv.playback.MediaManager;
-import org.jellyfin.androidtv.playback.PlaybackController;
+import org.jellyfin.androidtv.ui.playback.AudioEventListener;
+import org.jellyfin.androidtv.ui.playback.AudioNowPlayingActivity;
+import org.jellyfin.androidtv.ui.playback.MediaManager;
+import org.jellyfin.androidtv.ui.playback.PlaybackController;
 import org.jellyfin.androidtv.util.ImageUtils;
 import org.jellyfin.androidtv.util.TimeUtils;
+import org.jellyfin.apiclient.interaction.ApiClient;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
+
+import static org.koin.java.KoinJavaComponent.get;
 
 public class NowPlayingBug extends FrameLayout {
     ImageView npIcon;
@@ -121,7 +124,7 @@ public class NowPlayingBug extends FrameLayout {
     private void setInfo(BaseItemDto item) {
         if (item == null) return;
 
-        Glide.with(context).load(ImageUtils.getPrimaryImageUrl(item, TvApp.getApplication().getApiClient())).error(R.drawable.ic_album).override(35,35).centerInside().into(npIcon);
+        Glide.with(context).load(ImageUtils.getPrimaryImageUrl(item, get(ApiClient.class))).error(R.drawable.ic_album).override(35, 35).centerInside().into(npIcon);
         currentDuration = TimeUtils.formatMillis(item.getRunTimeTicks() != null ? item.getRunTimeTicks() / 10000 : 0);
         npDesc.setText(item.getAlbumArtist() != null ? item.getAlbumArtist() : item.getName());
     }

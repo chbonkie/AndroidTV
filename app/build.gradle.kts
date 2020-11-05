@@ -1,12 +1,14 @@
 plugins {
 	id("com.android.application")
-	id("kotlin-android")
-	id("kotlin-android-extensions")
+	kotlin("android")
+	kotlin("android.extensions")
 }
 
 android {
 	compileSdkVersion(29)
-	ndkVersion = "21.1.6352462"
+	// Explicitly specify ndk version for Azure
+	// Can be removed when version 4.1.x of the Android Gradle plugin is released
+	ndkVersion = "21.3.6528147"
 
 	defaultConfig {
 		// Android version targets
@@ -14,8 +16,8 @@ android {
 		targetSdkVersion(29)
 
 		// Release version
-		versionCode = 905
-		versionName = "0.11.0"
+		versionName = project.getVersionName()
+		versionCode = getVersionCode(versionName)
 	}
 
 	compileOptions {
@@ -48,39 +50,45 @@ android {
 			val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
 			output.outputFileName = output.outputFileName
 				.replace("app-", "jellyfin-androidtv_")
-				.replace(".apk", "_${variant.versionName}.apk")
+				.replace(".apk", "_v${variant.versionName}.apk")
 		}
 	}
 }
 
 dependencies {
 	// Jellyfin
-	implementation("com.github.jellyfin.jellyfin-apiclient-java:android:v0.6.0")
+	implementation("org.jellyfin.apiclient:android:0.7.4")
 
 	// Kotlin
 	implementation(kotlin("stdlib-jdk8"))
+
 	val kotlinCoroutinesVersion = "1.3.3"
 	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion")
 	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$kotlinCoroutinesVersion")
 
 	// Android(x)
-	implementation("androidx.core:core-ktx:1.2.0")
-	implementation("androidx.fragment:fragment-ktx:1.2.4")
+	implementation("androidx.core:core-ktx:1.3.1")
+	implementation("androidx.fragment:fragment-ktx:1.2.5")
 	val androidxLeanbackVersion = "1.1.0-alpha03"
 	implementation("androidx.leanback:leanback:$androidxLeanbackVersion")
 	implementation("androidx.leanback:leanback-preference:$androidxLeanbackVersion")
-	implementation("androidx.preference:preference:1.1.1")
-	implementation("androidx.appcompat:appcompat:1.1.0")
+	val androidxPreferenceVersion = "1.1.1"
+	implementation("androidx.preference:preference:$androidxPreferenceVersion")
+	implementation("androidx.preference:preference-ktx:$androidxPreferenceVersion")
+	implementation("androidx.appcompat:appcompat:1.2.0")
 	implementation("androidx.tvprovider:tvprovider:1.0.0")
-	implementation("androidx.palette:palette:1.0.0")
 	implementation("androidx.constraintlayout:constraintlayout:1.1.3")
 	implementation("androidx.recyclerview:recyclerview:1.1.0")
 	implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.2.0")
 	implementation("com.google.android:flexbox:2.0.1")
 
+	// Dependency Injection
+	val koinVersion = "2.1.6"
+	implementation("org.koin:koin-android-viewmodel:$koinVersion")
+
 	// Media players
 	implementation("com.amazon.android:exoplayer:2.11.3")
-	implementation("org.videolan.android:libvlc-all:3.2.5")
+	implementation("org.videolan.android:libvlc-all:3.3.2")
 
 	// Image utility
 	implementation("com.github.bumptech.glide:glide:4.11.0")

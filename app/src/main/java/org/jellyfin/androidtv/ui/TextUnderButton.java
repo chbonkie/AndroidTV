@@ -7,12 +7,9 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import org.jellyfin.androidtv.R;
-import org.jellyfin.androidtv.model.GotFocusEvent;
+import org.jellyfin.androidtv.data.model.GotFocusEvent;
 import org.jellyfin.androidtv.util.Utils;
 
-/**
- * Created by Eric on 2/20/2015.
- */
 public class TextUnderButton extends RelativeLayout {
 
     public static int STATE_PRIMARY = 0;
@@ -49,6 +46,8 @@ public class TextUnderButton extends RelativeLayout {
         }
 
         mButton = (android.widget.ImageButton) v.findViewById(R.id.imageButton);
+
+        if (label != null) mButton.setContentDescription(label);
 
         mButton.setImageResource(imageResource);
         mButton.setMaxHeight(size);

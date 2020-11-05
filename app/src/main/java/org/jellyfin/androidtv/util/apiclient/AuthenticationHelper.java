@@ -10,36 +10,30 @@ import android.widget.EditText;
 
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.browsing.MainActivity;
-import org.jellyfin.androidtv.details.DetailsActivity;
-import org.jellyfin.androidtv.model.LogonCredentials;
-import org.jellyfin.androidtv.model.repository.ConnectionManagerRepository;
-import org.jellyfin.androidtv.model.repository.SerializerRepository;
-import org.jellyfin.androidtv.startup.SelectServerActivity;
-import org.jellyfin.androidtv.startup.SelectUserActivity;
-import org.jellyfin.androidtv.util.DelayedMessage;
+import org.jellyfin.androidtv.data.model.LogonCredentials;
+import org.jellyfin.androidtv.ui.browsing.MainActivity;
+import org.jellyfin.androidtv.ui.itemdetail.FullDetailsActivity;
+import org.jellyfin.androidtv.ui.shared.KeyboardFocusChangeListener;
 import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.apiclient.interaction.ApiClient;
-import org.jellyfin.apiclient.interaction.ConnectionResult;
-import org.jellyfin.apiclient.interaction.IConnectionManager;
 import org.jellyfin.apiclient.interaction.Response;
 import org.jellyfin.apiclient.model.apiclient.ServerInfo;
-import org.jellyfin.apiclient.model.dto.UserDto;
 import org.jellyfin.apiclient.model.users.AuthenticationResult;
+import org.jellyfin.apiclient.serialization.GsonJsonSerializer;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.List;
 
 import timber.log.Timber;
+
+import static org.koin.java.KoinJavaComponent.get;
 
 public class AuthenticationHelper {
     public static void enterManualServerAddress(final Activity activity) {
         final EditText address = new EditText(activity);
         address.setHint(activity.getString(R.string.lbl_ip_hint));
         address.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        address.setOnFocusChangeListener(new KeyboardFocusChangeListener());
         new AlertDialog.Builder(activity)
                 .setTitle(activity.getString(R.string.lbl_enter_server_address))
                 .setMessage(activity.getString(R.string.lbl_valid_server_address))
@@ -52,10 +46,10 @@ public class AuthenticationHelper {
             public void onClick(DialogInterface dialog, int whichButton) {
                 String addressValue = address.getText().toString();
                 Timber.d("Entered address: %s", addressValue);
-                if (!addressValue.isEmpty()) {
-                    final IConnectionManager connectionManager = ConnectionManagerRepository.Companion.getInstance(activity).getConnectionManager();
-                    signInToServer(connectionManager, addressValue, activity);
-                }
+                ServerInfo info = new ServerInfo();
+                info.setAddress(addressValue);
+                get(ApiClient.class).EnableAutomaticNetworking(info);
+                AuthenticationHelper.enterManualUser(activity);
             }
         }).show();
     }
@@ -63,6 +57,7 @@ public class AuthenticationHelper {
     public static void enterManualUser(final Activity activity) {
         final EditText userName = new EditText(activity);
         userName.setInputType(InputType.TYPE_CLASS_TEXT);
+        userName.setOnFocusChangeListener(new KeyboardFocusChangeListener());
         new AlertDialog.Builder(activity)
                 .setTitle(activity.getString(R.string.lbl_enter_user_name))
                 .setView(userName)
@@ -76,6 +71,7 @@ public class AuthenticationHelper {
                 Timber.d("Entered user: %s", userValue);
                 final EditText userPw = new EditText(activity);
                 userPw.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                userPw.setOnFocusChangeListener(new KeyboardFocusChangeListener());
                 new AlertDialog.Builder(activity)
                         .setTitle(activity.getString(R.string.lbl_enter_user_pw))
                         .setView(userPw)
@@ -85,66 +81,11 @@ public class AuthenticationHelper {
                             }
                         }).setPositiveButton(activity.getString(R.string.lbl_ok), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
-                        loginUser(userName.getText().toString(), userPw.getText().toString(), TvApp.getApplication().getLoginApiClient(), activity);
+                        loginUser(userName.getText().toString(), userPw.getText().toString(), get(ApiClient.class), activity);
                     }
                 }).show();
             }
         }).show();
-    }
-
-    private static Response<ConnectionResult> getSignInResponse(final Activity activity, final String address) {
-        // This is taking longer than expected message
-        final DelayedMessage message = new DelayedMessage(activity);
-
-        return new Response<ConnectionResult>() {
-            @Override
-            public void onResponse(ConnectionResult serverResult) {
-                message.Cancel();
-
-                // Check the server version
-                if (!serverResult.getServers().isEmpty() &&
-                        !isSupportedServerVersion(serverResult.getServers().get(0))) {
-                    Utils.showToast(activity, activity.getString(R.string.msg_error_server_version, TvApp.MINIMUM_SERVER_VERSION));
-                    return;
-                }
-
-                switch (serverResult.getState()) {
-                    case Unavailable:
-                        Utils.showToast(activity, R.string.msg_error_server_unavailable);
-                        break;
-                    case SignedIn:
-                    case ServerSignIn:
-                        //Set api client for login
-                        TvApp.getApplication().setLoginApiClient(serverResult.getApiClient());
-                        //Open user selection
-                        Intent userIntent = new Intent(activity, SelectUserActivity.class);
-                        userIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-                        activity.startActivity(userIntent);
-                        break;
-                    default:
-                        Timber.e("Unexpected response %s trying to sign in to specific server %s", serverResult.getState().toString(), address);
-                        Utils.showToast(activity, activity.getString(R.string.msg_error_connecting_server));
-                }
-            }
-
-            @Override
-            public void onError(Exception exception) {
-                message.Cancel();
-                Timber.e(exception, "Error trying to sign in to specific server %s", address);
-                Utils.showToast(activity, activity.getString(R.string.msg_error_connecting_server));
-            }
-        };
-    }
-
-    /**
-     * Sign in to a specific server instance
-     *
-     * @param connectionManager Jellyfin API connection manager
-     * @param address           URL of the server to sign in to
-     * @param activity          Current Android activity
-     */
-    public static void signInToServer(IConnectionManager connectionManager, String address, final Activity activity) {
-        connectionManager.Connect(address, getSignInResponse(activity, address));
     }
 
     public static void loginUser(String userName, String pw, ApiClient apiClient, final Activity activity) {
@@ -181,119 +122,8 @@ public class AuthenticationHelper {
     public static void saveLoginCredentials(LogonCredentials creds, String fileName) throws IOException {
         TvApp app = TvApp.getApplication();
         OutputStream credsFile = app.openFileOutput(fileName, Context.MODE_PRIVATE);
-        credsFile.write(SerializerRepository.INSTANCE.getSerializer().SerializeToString(creds).getBytes());
+        credsFile.write(get(GsonJsonSerializer.class).SerializeToString(creds).getBytes());
         credsFile.close();
         app.setConfiguredAutoCredentials(creds);
-    }
-
-    public static LogonCredentials getSavedLoginCredentials(String fileName) {
-        TvApp app = TvApp.getApplication();
-        try {
-            InputStream credsFile = app.openFileInput(fileName);
-            String json = Utils.readStringFromStream(credsFile);
-            credsFile.close();
-            Timber.d("Saved credential JSON: %s", json);
-            return SerializerRepository.INSTANCE.getSerializer().DeserializeFromString(json, LogonCredentials.class);
-        } catch (IOException e) {
-            // none saved
-            return new LogonCredentials(new ServerInfo(), new UserDto());
-        } catch (Exception e) {
-            Timber.e(e, "Error interpreting saved login");
-            return new LogonCredentials(new ServerInfo(), new UserDto());
-        }
-    }
-
-    /**
-     * Find the correct server instance to connect to based on a {@link org.jellyfin.apiclient.interaction.ConnectionResult ConnectionResult}
-     *
-     * @param connectionManager Jellyfin API connection manager
-     * @param activity          Current Android activity
-     * @param response          Response of the Connect API call
-     */
-    public static void handleConnectionResponse(final IConnectionManager connectionManager, final Activity activity, ConnectionResult response) {
-        switch (response.getState()) {
-            case Unavailable:
-                Timber.d("No server available...");
-                Utils.showToast(activity, R.string.msg_error_server_unavailable);
-                break;
-            case ServerSignIn:
-                Timber.d("Sign in with server %s total: %d", response.getServers().get(0).getName(), response.getServers().size());
-                signInToServer(connectionManager, response.getServers().get(0).getAddress(), activity);
-                break;
-            case SignedIn:
-                Timber.d("Ignoring saved connection manager sign in");
-                connectionManager.GetAvailableServers(new Response<ArrayList<ServerInfo>>() {
-                    @Override
-                    public void onResponse(ArrayList<ServerInfo> serverResponse) {
-                        if (serverResponse.size() == 1) {
-                            //Signed in before and have just one server so go directly to user screen
-                            signInToServer(connectionManager, serverResponse.get(0).getAddress(), activity);
-                        } else {
-                            //More than one server so show selection
-                            Intent serverIntent = new Intent(activity, SelectServerActivity.class);
-                            List<String> payload = new ArrayList<>();
-                            for (ServerInfo server : serverResponse) {
-                                payload.add(SerializerRepository.INSTANCE.getSerializer().SerializeToString(server));
-                            }
-                            serverIntent.putExtra("Servers", payload.toArray(new String[]{}));
-                            serverIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-                            activity.startActivity(serverIntent);
-                        }
-                    }
-                });
-                break;
-            case ConnectSignIn:
-            case ServerSelection:
-                Timber.d("Select A server");
-                connectionManager.GetAvailableServers(new Response<ArrayList<ServerInfo>>() {
-                    @Override
-                    public void onResponse(ArrayList<ServerInfo> serverResponse) {
-                        Intent serverIntent = new Intent(activity, SelectServerActivity.class);
-                        List<String> payload = new ArrayList<>();
-                        for (ServerInfo server : serverResponse) {
-                            payload.add(SerializerRepository.INSTANCE.getSerializer().SerializeToString(server));
-                        }
-                        serverIntent.putExtra("Servers", payload.toArray(new String[]{}));
-                        serverIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-                        activity.startActivity(serverIntent);
-                    }
-                });
-                break;
-        }
-    }
-
-    /**
-     * Automatically sign in to available servers
-     *
-     * @param connectionManager Jellyfin API connection manager
-     * @param activity          Current Android activity
-     */
-    public static void automaticSignIn(final IConnectionManager connectionManager, final Activity activity) {
-        connectionManager.Connect(new Response<ConnectionResult>() {
-            @Override
-            public void onResponse(final ConnectionResult response) {
-                handleConnectionResponse(connectionManager, activity, response);
-            }
-
-            @Override
-            public void onError(Exception exception) {
-                Timber.e(exception, "Error trying to automatically sign in");
-                Utils.showToast(activity, activity.getString(R.string.msg_error_connecting_server));
-            }
-        });
-    }
-
-    /**
-     * Check if the server version is supported by the app.
-     *
-     * @param serverInfo The ServerInfo returned by a Connect API call
-     * @return true if the server version is supported or not specified
-     */
-    public static boolean isSupportedServerVersion(final ServerInfo serverInfo) {
-        if (serverInfo != null && serverInfo.getVersion() != null) {
-            return Utils.versionGreaterThanOrEqual(serverInfo.getVersion(), TvApp.MINIMUM_SERVER_VERSION);
-        }
-        // If a version is not available, allow the server
-        return true;
     }
 }

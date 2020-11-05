@@ -6,9 +6,6 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.TypedArray;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Color;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.text.InputType;
@@ -20,25 +17,20 @@ import android.widget.Toast;
 import org.jellyfin.androidtv.BuildConfig;
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.model.repository.SerializerRepository;
-import org.jellyfin.androidtv.preferences.enums.AudioBehavior;
-import org.jellyfin.androidtv.startup.DpadPwActivity;
+import org.jellyfin.androidtv.preference.UserPreferences;
+import org.jellyfin.androidtv.preference.constant.AudioBehavior;
+import org.jellyfin.androidtv.ui.startup.DpadPwActivity;
 import org.jellyfin.androidtv.util.apiclient.AuthenticationHelper;
+import org.jellyfin.apiclient.interaction.ApiClient;
 import org.jellyfin.apiclient.model.dto.UserDto;
+import org.jellyfin.apiclient.serialization.GsonJsonSerializer;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.UUID;
 
 import timber.log.Timber;
+
+import static org.koin.java.KoinJavaComponent.get;
 
 /**
  * A collection of utility methods, all static.
@@ -46,8 +38,6 @@ import timber.log.Timber;
 public class Utils {
     // send the tone to the "alarm" stream (classic beeps go there) with 50% volume
     private static final ToneGenerator TONE_GENERATOR = new ToneGenerator(AudioManager.STREAM_ALARM, 50);
-    // set of characters used for generating hexadecimal strings
-    private static final char[] HEX_CHARS = "0123456789ABCDEF".toCharArray();
 
     /**
      * Shows a (long) toast
@@ -88,17 +78,6 @@ public class Utils {
 
     public static boolean isTrue(Boolean value) {
         return value != null && value;
-    }
-
-    public static String readStringFromStream(InputStream inputStream) throws IOException {
-        ByteArrayOutputStream result = new ByteArrayOutputStream();
-        byte[] buffer = new byte[1024];
-        int length;
-        while ((length = inputStream.read(buffer)) != -1) {
-            result.write(buffer, 0, length);
-        }
-
-        return result.toString(StandardCharsets.UTF_8.name());
     }
 
     public static String getVersionString() {
@@ -177,26 +156,13 @@ public class Utils {
 
             return true;
         } catch (Exception e) {
+            Timber.e(e);
             return false;
         }
     }
 
-    public static Bitmap getBitmapFromURL(String src) {
-        try {
-            URL url = new URL(src);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setDoInput(true);
-            connection.connect();
-            InputStream input = connection.getInputStream();
-            return BitmapFactory.decodeStream(input);
-        } catch (IOException e) {
-            // Log exception
-            return null;
-        }
-    }
-
     public static int getMaxBitrate() {
-        String maxRate = TvApp.getApplication().getUserPreferences().getMaxBitrate();
+        String maxRate = get(UserPreferences.class).get(UserPreferences.Companion.getMaxBitrate());
         float factor = Float.parseFloat(maxRate) * 10;
         return Math.min(factor == 0 ? TvApp.getApplication().getAutoBitrate() : ((int) factor * 100000), 100000000);
     }
@@ -219,9 +185,9 @@ public class Utils {
     }
 
     public static void processPasswordEntry(final Activity activity, final UserDto user, final String directItemId) {
-        if (TvApp.getApplication().getUserPreferences().getPasswordDPadEnabled()) {
+        if (get(UserPreferences.class).get(UserPreferences.Companion.getPasswordDPadEnabled())) {
             Intent pwIntent = new Intent(activity, DpadPwActivity.class);
-            pwIntent.putExtra("User", SerializerRepository.INSTANCE.getSerializer().SerializeToString(user));
+            pwIntent.putExtra("User", get(GsonJsonSerializer.class).SerializeToString(user));
             pwIntent.putExtra("ItemId", directItemId);
             pwIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
             activity.startActivity(pwIntent);
@@ -230,36 +196,15 @@ public class Utils {
             final EditText password = new EditText(activity);
             password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
             new AlertDialog.Builder(activity)
-                    .setTitle("Enter Password")
-                    .setMessage("Please enter password for " + user.getName())
+                    .setTitle(R.string.password_prompt)
+                    .setMessage(TvApp.getApplication().getString(R.string.password_prompt_message, user.getName()))
                     .setView(password)
-                    .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+                    .setPositiveButton(R.string.lbl_ok, new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int whichButton) {
                             String pw = password.getText().toString();
-                            AuthenticationHelper.loginUser(user.getName(), pw, TvApp.getApplication().getLoginApiClient(), activity, directItemId);
+                            AuthenticationHelper.loginUser(user.getName(), pw, get(ApiClient.class), activity, directItemId);
                         }
                     }).show();
-        }
-    }
-
-    private static String convertToHex(byte[] data) {
-        char[] hexChars = new char[data.length * 2];
-        for (int j = 0; j < data.length; j++) {
-            int v = data[j] & 0xFF;
-            hexChars[j * 2] = HEX_CHARS[v >>> 4];
-            hexChars[j * 2 + 1] = HEX_CHARS[v & 0x0F];
-        }
-        return new String(hexChars);
-    }
-
-    public static String getMD5Hash(String text) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            md.update(text.getBytes(StandardCharsets.ISO_8859_1), 0, text.length());
-            byte[] md5hash = md.digest();
-            return convertToHex(md5hash);
-        } catch (NoSuchAlgorithmException e) {
-            return UUID.randomUUID().toString();
         }
     }
 
@@ -270,21 +215,6 @@ public class Utils {
             return true;
         }
 
-        return (DeviceUtils.isFireTv() && !DeviceUtils.is50()) || TvApp.getApplication().getUserPreferences().getAudioBehaviour() == AudioBehavior.DOWNMIX_TO_STEREO;
-    }
-
-    /**
-     * Returns darker version of specified <code>color</code>.
-     */
-    public static int darker(int color, float factor) {
-        int a = Color.alpha(color);
-        int r = Color.red(color);
-        int g = Color.green(color);
-        int b = Color.blue(color);
-
-        return Color.argb(a,
-                Math.max((int) (r * factor), 0),
-                Math.max((int) (g * factor), 0),
-                Math.max((int) (b * factor), 0));
+        return (DeviceUtils.isFireTv() && !DeviceUtils.is50()) || get(UserPreferences.class).get(UserPreferences.Companion.getAudioBehaviour()) == AudioBehavior.DOWNMIX_TO_STEREO;
     }
 }

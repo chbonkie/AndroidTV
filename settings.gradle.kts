@@ -1,8 +1,10 @@
+import java.util.*
+
 include(":app")
 
 // Load properties from local.properties
-val properties = java.util.Properties().apply {
-	val location = file("local.properties")
+val properties = Properties().apply {
+	val location = File("local.properties")
 	if (location.exists())
 		load(location.inputStream())
 }
@@ -15,7 +17,7 @@ val apiclientLocation = "../jellyfin-apiclient-java"
 if (File(apiclientLocation).exists() && enableDependencySubstitution) {
 	includeBuild(apiclientLocation) {
 		dependencySubstitution {
-			substitute(module("com.github.jellyfin.jellyfin-apiclient-java:android")).with(project(":android"))
+			substitute(module("org.jellyfin.apiclient:android")).with(project(":android"))
 		}
 	}
 }

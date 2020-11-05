@@ -14,8 +14,8 @@ import android.widget.TextView;
 
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.livetv.ILiveTvGuide;
-import org.jellyfin.androidtv.livetv.TvManager;
+import org.jellyfin.androidtv.ui.livetv.ILiveTvGuide;
+import org.jellyfin.androidtv.ui.livetv.TvManager;
 import org.jellyfin.androidtv.util.InfoLayoutHelper;
 import org.jellyfin.androidtv.util.TimeUtils;
 import org.jellyfin.androidtv.util.Utils;
@@ -36,14 +36,14 @@ public class ProgramGridCell extends RelativeLayout implements IRecordingIndicat
     private boolean isFirst;
     private final int IND_HEIGHT = Utils.convertDpToPixel(TvApp.getApplication(), 10);
 
-    public ProgramGridCell(Context context, ILiveTvGuide activity, BaseItemDto program) {
+    public ProgramGridCell(Context context, ILiveTvGuide activity, BaseItemDto program, boolean keyListen) {
         super(context);
-        initComponent((Activity) context, activity, program);
+        initComponent((Activity) context, activity, program, keyListen);
     }
 
-    private void initComponent(Activity context, ILiveTvGuide activity, BaseItemDto program) {
+    private void initComponent(Activity context, ILiveTvGuide activity, BaseItemDto program, boolean keyListen) {
         mActivity = activity;
-        mProgram = program;
+
         LayoutInflater inflater = LayoutInflater.from(context);
         View v = inflater.inflate(R.layout.program_grid_cell, this, false);
         this.addView(v);
@@ -101,12 +101,15 @@ public class ProgramGridCell extends RelativeLayout implements IRecordingIndicat
             mRecIndicator.setImageResource(R.drawable.ic_record_red);
         }
 
-        setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mActivity.showProgramOptions();
-            }
-        });
+
+        if (keyListen) {
+            setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    mActivity.showProgramOptions();
+                }
+            });
+        }
 
     }
 

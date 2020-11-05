@@ -6,14 +6,11 @@ import android.content.Intent;
 import android.view.KeyEvent;
 
 import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.playback.AudioNowPlayingActivity;
-import org.jellyfin.androidtv.playback.MediaManager;
+import org.jellyfin.androidtv.ui.playback.AudioNowPlayingActivity;
+import org.jellyfin.androidtv.ui.playback.MediaManager;
 
 import timber.log.Timber;
 
-/**
- * Created by Eric on 4/17/2015.
- */
 public class RemoteControlReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {

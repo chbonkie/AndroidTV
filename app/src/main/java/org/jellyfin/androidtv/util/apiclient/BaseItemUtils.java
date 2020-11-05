@@ -5,14 +5,11 @@ import android.text.format.DateFormat;
 
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.model.ChapterItemInfo;
+import org.jellyfin.androidtv.data.model.ChapterItemInfo;
+import org.jellyfin.androidtv.ui.livetv.TvManager;
 import org.jellyfin.androidtv.util.TimeUtils;
 import org.jellyfin.androidtv.util.Utils;
-
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-
+import org.jellyfin.apiclient.interaction.ApiClient;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
 import org.jellyfin.apiclient.model.dto.BaseItemPerson;
 import org.jellyfin.apiclient.model.dto.BaseItemType;
@@ -23,6 +20,12 @@ import org.jellyfin.apiclient.model.entities.LocationType;
 import org.jellyfin.apiclient.model.entities.PersonType;
 import org.jellyfin.apiclient.model.library.PlayAccess;
 import org.jellyfin.apiclient.model.livetv.SeriesTimerInfoDto;
+
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+
+import static org.koin.java.KoinJavaComponent.get;
 
 public class BaseItemUtils {
     // TODO Feature Envy!!! Wants to live in BaseItemDto.
@@ -68,6 +71,10 @@ public class BaseItemUtils {
                 return item.getOfficialRating();
         }
 
+    }
+
+    public static String getProgramUnknownChannelName(BaseItemDto baseItem) {
+        return TvManager.getChannel(TvManager.getAllChannelsIndex(baseItem.getChannelId())).getName();
     }
 
     public static String getProgramSubText(BaseItemDto baseItem) {
@@ -123,7 +130,7 @@ public class BaseItemUtils {
             if (dto.getHasImage()) {
                 options.setTag(dto.getImageTag());
                 options.setImageIndex(i);
-                chapter.setImagePath(TvApp.getApplication().getApiClient().GetImageUrl(item.getId(), options));
+                chapter.setImagePath(get(ApiClient.class).GetImageUrl(item.getId(), options));
             }
             chapters.add(chapter);
             i++;

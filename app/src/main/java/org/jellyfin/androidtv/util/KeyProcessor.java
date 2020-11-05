@@ -10,20 +10,18 @@ import android.widget.PopupMenu;
 
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.base.BaseActivity;
-import org.jellyfin.androidtv.base.CustomMessage;
-import org.jellyfin.androidtv.details.ItemListActivity;
-import org.jellyfin.androidtv.details.PhotoPlayerActivity;
-import org.jellyfin.androidtv.itemhandling.AudioQueueItem;
-import org.jellyfin.androidtv.itemhandling.BaseRowItem;
-import org.jellyfin.androidtv.model.repository.ConnectionManagerRepository;
-import org.jellyfin.androidtv.playback.AudioNowPlayingActivity;
-import org.jellyfin.androidtv.playback.MediaManager;
-import org.jellyfin.androidtv.querying.StdItemQuery;
+import org.jellyfin.androidtv.constant.CustomMessage;
+import org.jellyfin.androidtv.data.querying.StdItemQuery;
+import org.jellyfin.androidtv.ui.shared.BaseActivity;
+import org.jellyfin.androidtv.ui.itemdetail.ItemListActivity;
+import org.jellyfin.androidtv.ui.itemdetail.PhotoPlayerActivity;
+import org.jellyfin.androidtv.ui.itemhandling.AudioQueueItem;
+import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
+import org.jellyfin.androidtv.ui.playback.AudioNowPlayingActivity;
+import org.jellyfin.androidtv.ui.playback.MediaManager;
 import org.jellyfin.androidtv.util.apiclient.BaseItemUtils;
 import org.jellyfin.androidtv.util.apiclient.PlaybackHelper;
-import org.jellyfin.apiclient.interaction.EmptyResponse;
-import org.jellyfin.apiclient.interaction.IConnectionManager;
+import org.jellyfin.apiclient.interaction.ApiClient;
 import org.jellyfin.apiclient.interaction.Response;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
 import org.jellyfin.apiclient.model.dto.BaseItemType;
@@ -35,6 +33,8 @@ import org.jellyfin.apiclient.model.querying.ItemsResult;
 import java.util.List;
 
 import timber.log.Timber;
+
+import static org.koin.java.KoinJavaComponent.get;
 
 public class KeyProcessor {
 
@@ -207,7 +207,6 @@ public class KeyProcessor {
                     case Person:
                         break;
                     case Server:
-                        createServerMenu(rowItem, activity);
                         break;
                     case User:
                         break;
@@ -227,29 +226,6 @@ public class KeyProcessor {
                 return true;
         }
         return false;
-    }
-
-    private static void createServerMenu(final BaseRowItem rowItem, final BaseActivity activity) {
-        PopupMenu menu = Utils.createPopupMenu(activity, activity.getCurrentFocus(), Gravity.TOP);
-        menu.getMenu().add(0, MENU_FORGET, 0, R.string.lbl_forget);
-        menu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem item) {
-                if (item.getItemId() == MENU_FORGET) {
-                    final IConnectionManager connectionManager = ConnectionManagerRepository.Companion.getInstance(activity).getConnectionManager();
-                    connectionManager.DeleteServer(rowItem.getItemId(), new EmptyResponse() {
-                        @Override
-                        public void onResponse() {
-                            activity.sendMessage(CustomMessage.RemoveCurrentItem);
-                        }
-                    });
-                    return true;
-                }
-                return false;
-            }
-        });
-
-        menu.show();
     }
 
     private static void createItemMenu(BaseRowItem rowItem, UserItemDataDto userData, BaseActivity activity) {
@@ -395,7 +371,7 @@ public class KeyProcessor {
                         });
 
                     } else {
-                        TvApp.getApplication().getApiClient().GetItemAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
+                        get(ApiClient.class).GetItemAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
                             @Override
                             public void onResponse(BaseItemDto response) {
                                 MediaManager.addToVideoQueue(response);
@@ -419,11 +395,11 @@ public class KeyProcessor {
                     query.setLimit(1);
                     query.setExcludeItemTypes(new String[] {"Series","Season","Folder","MusicAlbum","Playlist","BoxSet"});
                     query.setFilters(new ItemFilter[] {ItemFilter.IsUnplayed});
-                    TvApp.getApplication().getApiClient().GetItemsAsync(query, new Response<ItemsResult>() {
+                    get(ApiClient.class).GetItemsAsync(query, new Response<ItemsResult>() {
                         @Override
                         public void onResponse(ItemsResult response) {
                             if (response.getTotalRecordCount() == 0) {
-                                Utils.showToast(mCurrentActivity, "No items to play");
+                                Utils.showToast(mCurrentActivity, R.string.msg_no_items);
                             } else {
                                 PlaybackHelper.retrieveAndPlay(response.getItems()[0].getId(), false, mCurrentActivity);
                             }
@@ -516,7 +492,7 @@ public class KeyProcessor {
     };
 
     private static void markPlayed() {
-        TvApp.getApplication().getApiClient().MarkPlayedAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), null, new Response<UserItemDataDto>() {
+        get(ApiClient.class).MarkPlayedAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), null, new Response<UserItemDataDto>() {
             @Override
             public void onResponse(UserItemDataDto response) {
                 mCurrentActivity.sendMessage(CustomMessage.RefreshCurrentItem);
@@ -525,14 +501,14 @@ public class KeyProcessor {
             @Override
             public void onError(Exception exception) {
                 Timber.e(exception, "Error setting played status");
-                Utils.showToast(mCurrentActivity, "Error setting played status");
+                Utils.showToast(mCurrentActivity, R.string.playing_error);
             }
         });
 
     }
 
     private static void markUnplayed() {
-        TvApp.getApplication().getApiClient().MarkUnplayedAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<UserItemDataDto>() {
+        get(ApiClient.class).MarkUnplayedAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<UserItemDataDto>() {
             @Override
             public void onResponse(UserItemDataDto response) {
                 mCurrentActivity.sendMessage(CustomMessage.RefreshCurrentItem);
@@ -541,14 +517,14 @@ public class KeyProcessor {
             @Override
             public void onError(Exception exception) {
                 Timber.e(exception, "Error setting played status");
-                Utils.showToast(mCurrentActivity, "Error setting played status");
+                Utils.showToast(mCurrentActivity, R.string.playing_error);
             }
         });
 
     }
 
     private static void toggleFavorite(boolean fav) {
-        TvApp.getApplication().getApiClient().UpdateFavoriteStatusAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), fav, new Response<UserItemDataDto>() {
+        get(ApiClient.class).UpdateFavoriteStatusAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), fav, new Response<UserItemDataDto>() {
             @Override
             public void onResponse(UserItemDataDto response) {
                 mCurrentActivity.sendMessage(CustomMessage.RefreshCurrentItem);
@@ -558,7 +534,7 @@ public class KeyProcessor {
             @Override
             public void onError(Exception exception) {
                 Timber.e(exception, "Error setting favorite status");
-                Utils.showToast(mCurrentActivity, "Error setting favorite status");
+                Utils.showToast(mCurrentActivity, R.string.favorite_error);
             }
         });
 
@@ -566,7 +542,7 @@ public class KeyProcessor {
 
     private static void toggleLikes(Boolean likes) {
         if (likes == null) {
-            TvApp.getApplication().getApiClient().ClearUserItemRatingAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<UserItemDataDto>() {
+            get(ApiClient.class).ClearUserItemRatingAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<UserItemDataDto>() {
                 @Override
                 public void onResponse(UserItemDataDto response) {
                     mCurrentActivity.sendMessage(CustomMessage.RefreshCurrentItem);
@@ -575,12 +551,12 @@ public class KeyProcessor {
                 @Override
                 public void onError(Exception exception) {
                     Timber.e(exception, "Error clearing like status");
-                    Utils.showToast(mCurrentActivity, "Error clearing like status");
+                    Utils.showToast(mCurrentActivity, R.string.like_clearing_error);
                 }
             });
 
         } else {
-            TvApp.getApplication().getApiClient().UpdateUserItemRatingAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), likes, new Response<UserItemDataDto>() {
+            get(ApiClient.class).UpdateUserItemRatingAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), likes, new Response<UserItemDataDto>() {
                 @Override
                 public void onResponse(UserItemDataDto response) {
                     mCurrentActivity.sendMessage(CustomMessage.RefreshCurrentItem);
@@ -589,7 +565,7 @@ public class KeyProcessor {
                 @Override
                 public void onError(Exception exception) {
                     Timber.e(exception, "Error setting like status");
-                    Utils.showToast(mCurrentActivity, "Error setting like status");
+                    Utils.showToast(mCurrentActivity, R.string.like_setting_error);
                 }
             });
         }

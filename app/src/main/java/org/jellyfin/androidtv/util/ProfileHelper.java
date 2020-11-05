@@ -1,11 +1,8 @@
 package org.jellyfin.androidtv.util;
 
-import android.os.Build;
-
-import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.constants.CodecTypes;
-import org.jellyfin.androidtv.constants.ContainerTypes;
-import org.jellyfin.androidtv.model.compat.AndroidProfileOptions;
+import org.jellyfin.androidtv.constant.CodecTypes;
+import org.jellyfin.androidtv.constant.ContainerTypes;
+import org.jellyfin.androidtv.preference.UserPreferences;
 import org.jellyfin.apiclient.model.dlna.CodecProfile;
 import org.jellyfin.apiclient.model.dlna.CodecType;
 import org.jellyfin.apiclient.model.dlna.ContainerProfile;
@@ -25,6 +22,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import timber.log.Timber;
+
+import static org.koin.java.KoinJavaComponent.get;
 
 public class ProfileHelper {
     private static MediaCodecCapabilitiesTest MediaTest = new MediaCodecCapabilitiesTest();
@@ -173,7 +172,6 @@ public class ProfileHelper {
             ContainerTypes.OGM,
             ContainerTypes.OGV,
             ContainerTypes.M2V,
-            ContainerTypes.AVI,
             ContainerTypes.MPG,
             ContainerTypes.MPEG,
             ContainerTypes.MP4,
@@ -237,20 +235,11 @@ public class ProfileHelper {
                         new ProfileCondition(ProfileConditionType.GreaterThanEqual, ProfileConditionValue.RefFrames, "2"),
                 });
 
-        ContainerProfile videoContainerProfile = new ContainerProfile();
-        videoContainerProfile.setType(DlnaProfileType.Video);
-        videoContainerProfile.setContainer(ContainerTypes.AVI);
-        videoContainerProfile.setConditions(new ProfileCondition[]
-                {
-                        new ProfileCondition(ProfileConditionType.NotEquals, ProfileConditionValue.VideoCodecTag, "xvid"),
-                });
-
         CodecProfile videoAudioCodecProfile = new CodecProfile();
         videoAudioCodecProfile.setType(CodecType.VideoAudio);
-        videoAudioCodecProfile.setConditions(new ProfileCondition[]{new ProfileCondition(ProfileConditionType.LessThanEqual, ProfileConditionValue.AudioChannels, "6")});
+        videoAudioCodecProfile.setConditions(new ProfileCondition[]{new ProfileCondition(ProfileConditionType.LessThanEqual, ProfileConditionValue.AudioChannels, "8")});
 
         profile.setCodecProfiles(new CodecProfile[]{getHevcProfile(), h264MainProfile, videoAudioCodecProfile});
-        profile.setContainerProfiles(new ContainerProfile[] {videoContainerProfile});
         profile.setSubtitleProfiles(new SubtitleProfile[]{
                 getSubtitleProfile("srt", SubtitleDeliveryMethod.External),
                 getSubtitleProfile("srt", SubtitleDeliveryMethod.Embed),
@@ -271,7 +260,7 @@ public class ProfileHelper {
         profile.setName("Android-Exo");
 
         List<DirectPlayProfile> directPlayProfiles = new ArrayList<>();
-        if (!isLiveTv || TvApp.getApplication().getUserPreferences().getLiveTvDirectPlayEnabled()) {
+        if (!isLiveTv || get(UserPreferences.class).get(UserPreferences.Companion.getLiveTvDirectPlayEnabled())) {
             DirectPlayProfile videoDirectPlayProfile = new DirectPlayProfile();
             List<String> containers = new ArrayList<>();
             if (isLiveTv) {
@@ -466,14 +455,5 @@ public class ProfileHelper {
         subs.setFormat(format);
         subs.setMethod(method);
         return subs;
-    }
-
-    public static AndroidProfileOptions getProfileOptions() {
-        AndroidProfileOptions options = new AndroidProfileOptions(Build.MODEL);
-        options.SupportsHls = false;
-        options.SupportsMkv = true;
-//        options.SupportsAc3 = is60();
-//        options.SupportsDts = is60();
-        return options;
     }
 }
