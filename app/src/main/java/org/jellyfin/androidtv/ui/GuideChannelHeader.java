@@ -14,39 +14,33 @@ import androidx.core.content.ContextCompat;
 import com.bumptech.glide.Glide;
 
 import org.jellyfin.androidtv.R;
-import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.ui.livetv.ILiveTvGuide;
-import org.jellyfin.androidtv.ui.livetv.LiveTvGuideActivity;
+import org.jellyfin.androidtv.ui.livetv.LiveTvGuide;
 import org.jellyfin.androidtv.util.ImageUtils;
 import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.apiclient.interaction.ApiClient;
 import org.jellyfin.apiclient.model.livetv.ChannelInfoDto;
-
-import static org.koin.java.KoinJavaComponent.get;
+import org.koin.java.KoinJavaComponent;
 
 public class GuideChannelHeader extends RelativeLayout {
-    final int IMAGE_WIDTH = Utils.convertDpToPixel(TvApp.getApplication(), 50);
-    final int IMAGE_HEIGHT = Utils.convertDpToPixel(TvApp.getApplication(), 30);
-    final int HEADER_WIDTH = Utils.convertDpToPixel(TvApp.getApplication(), 160);
-
     private ImageView mChannelImage;
     private ImageView mFavImage;
     private ChannelInfoDto mChannel;
     private Context mContext;
-    private ILiveTvGuide mTvGuide;
+    private LiveTvGuide mTvGuide;
 
-    public GuideChannelHeader(Context context, ILiveTvGuide tvGuide, ChannelInfoDto channel) {
+    public GuideChannelHeader(Context context, LiveTvGuide tvGuide, ChannelInfoDto channel) {
         super(context);
         initComponent(context, tvGuide, channel);
     }
 
-    private void initComponent(Context context, ILiveTvGuide tvGuide, ChannelInfoDto channel) {
+    private void initComponent(Context context, LiveTvGuide tvGuide, ChannelInfoDto channel) {
         mContext = context;
         mChannel = channel;
         mTvGuide = tvGuide;
         LayoutInflater inflater = LayoutInflater.from(context);
         View v = inflater.inflate(R.layout.channel_header, this, false);
-        v.setLayoutParams(new AbsListView.LayoutParams(HEADER_WIDTH, LiveTvGuideActivity.ROW_HEIGHT));
+        int headerWidth = Utils.convertDpToPixel(context, 160);
+        v.setLayoutParams(new AbsListView.LayoutParams(headerWidth, Utils.convertDpToPixel(context, 55)));
         this.addView(v);
         this.setFocusable(true);
         ((TextView) findViewById(R.id.channelName)).setText(channel.getName());
@@ -59,9 +53,12 @@ public class GuideChannelHeader extends RelativeLayout {
     }
 
     public void loadImage() {
+        int imageWidth = Utils.convertDpToPixel(mContext, 50);
+        int imageHeight = Utils.convertDpToPixel(mContext, 30);
+
         Glide.with(mContext)
-                .load(ImageUtils.getPrimaryImageUrl(mChannel, get(ApiClient.class)))
-                .override(IMAGE_WIDTH, IMAGE_HEIGHT)
+                .load(ImageUtils.getPrimaryImageUrl(mChannel, KoinJavaComponent.<ApiClient>get(ApiClient.class)))
+                .override(imageWidth, imageHeight)
                 .centerInside()
                 .into(mChannelImage);
     }
@@ -80,11 +77,11 @@ public class GuideChannelHeader extends RelativeLayout {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
 
         if (gainFocus) {
-            setBackgroundColor(Utils.getThemeColor(getContext(), android.R.attr.colorAccent));
+            setBackgroundColor(Utils.getThemeColor(mContext, android.R.attr.colorAccent));
 
             mTvGuide.setSelectedProgram(this);
         } else {
-            setBackground(ContextCompat.getDrawable(getContext(), R.drawable.light_border));
+            setBackground(ContextCompat.getDrawable(mContext, R.drawable.light_border));
         }
     }
 

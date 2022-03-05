@@ -1,44 +1,26 @@
 package org.jellyfin.androidtv.util;
 
-import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
-import android.content.Intent;
 import android.content.res.TypedArray;
 import android.media.AudioManager;
-import android.media.ToneGenerator;
-import android.text.InputType;
-import android.view.View;
-import android.widget.EditText;
-import android.widget.PopupMenu;
 import android.widget.Toast;
 
-import org.jellyfin.androidtv.BuildConfig;
-import org.jellyfin.androidtv.R;
+import androidx.annotation.NonNull;
+
 import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.preference.UserPreferences;
 import org.jellyfin.androidtv.preference.constant.AudioBehavior;
-import org.jellyfin.androidtv.ui.startup.DpadPwActivity;
-import org.jellyfin.androidtv.util.apiclient.AuthenticationHelper;
-import org.jellyfin.apiclient.interaction.ApiClient;
-import org.jellyfin.apiclient.model.dto.UserDto;
-import org.jellyfin.apiclient.serialization.GsonJsonSerializer;
+import org.koin.java.KoinJavaComponent;
 
 import java.util.Arrays;
 import java.util.Iterator;
 
 import timber.log.Timber;
 
-import static org.koin.java.KoinJavaComponent.get;
-
 /**
  * A collection of utility methods, all static.
  */
 public class Utils {
-    // send the tone to the "alarm" stream (classic beeps go there) with 50% volume
-    private static final ToneGenerator TONE_GENERATOR = new ToneGenerator(AudioManager.STREAM_ALARM, 50);
-
     /**
      * Shows a (long) toast
      *
@@ -59,29 +41,17 @@ public class Utils {
         Toast.makeText(context, context.getString(resourceId), Toast.LENGTH_LONG).show();
     }
 
-    public static int convertDpToPixel(Context ctx, int dp) {
+    public static int convertDpToPixel(@NonNull Context ctx, int dp) {
+        return convertDpToPixel(ctx, (float) dp);
+    }
+
+    public static int convertDpToPixel(@NonNull Context ctx, float dp) {
         float density = ctx.getResources().getDisplayMetrics().density;
-        return Math.round((float) dp * density);
-    }
-
-    public static void beep() {
-        beep(200);
-    }
-
-    public static void beep(int ms) {
-        makeTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, ms);
-    }
-
-    public static void makeTone(int type, int ms) {
-        TONE_GENERATOR.startTone(type, ms);
+        return Math.round(dp * density);
     }
 
     public static boolean isTrue(Boolean value) {
         return value != null && value;
-    }
-
-    public static String getVersionString() {
-        return TvApp.getApplication().getString(R.string.lbl_version) + BuildConfig.VERSION_NAME;
     }
 
     public static String firstToUpper(String value) {
@@ -134,44 +104,17 @@ public class Utils {
         return join(separator, Arrays.asList(items));
     }
 
-    public static boolean versionGreaterThanOrEqual(String firstVersion, String secondVersion) {
-        try {
-            String[] firstVersionComponents = firstVersion.split("[.]");
-            String[] secondVersionComponents = secondVersion.split("[.]");
-            int firstLength = firstVersionComponents.length;
-            int secondLength = secondVersionComponents.length;
-            int firstMajor = firstLength > 0 ? Integer.parseInt(firstVersionComponents[0]) : 0;
-            int secondMajor = secondLength > 0 ? Integer.parseInt(secondVersionComponents[0]) : 0;
-            int firstMinor = firstLength > 1 ? Integer.parseInt(firstVersionComponents[1]) : 0;
-            int secondMinor = secondLength > 1 ? Integer.parseInt(secondVersionComponents[1]) : 0;
-            int firstBuild = firstLength > 2 ? Integer.parseInt(firstVersionComponents[2]) : 0;
-            int secondBuild = secondLength > 0 ? Integer.parseInt(secondVersionComponents[2]) : 0;
-            int firstRelease = firstLength > 3 ? Integer.parseInt(firstVersionComponents[3]) : 0;
-            int secondRelease = secondLength > 3 ? Integer.parseInt(secondVersionComponents[3]) : 0;
-
-            if (firstMajor < secondMajor) return false;
-            if (firstMajor == secondMajor && firstMinor < secondMinor) return false;
-            if (firstMajor == secondMajor && firstMinor == secondMinor && firstBuild < secondBuild) return false;
-            if (firstMajor == secondMajor && firstMinor == secondMinor && firstBuild == secondBuild && firstRelease < secondRelease) return false;
-
-            return true;
-        } catch (Exception e) {
-            Timber.e(e);
-            return false;
+    public static int getMaxBitrate() {
+        String maxRate = KoinJavaComponent.<UserPreferences>get(UserPreferences.class).get(UserPreferences.Companion.getMaxBitrate());
+        Long autoRate = KoinJavaComponent.<AutoBitrate>get(AutoBitrate.class).getBitrate();
+        if (maxRate.equals(UserPreferences.MAX_BITRATE_AUTO) && autoRate != null) {
+            return autoRate.intValue();
+        } else {
+            return (int) (Float.parseFloat(maxRate) * 1_000_000);
         }
     }
 
-    public static int getMaxBitrate() {
-        String maxRate = get(UserPreferences.class).get(UserPreferences.Companion.getMaxBitrate());
-        float factor = Float.parseFloat(maxRate) * 10;
-        return Math.min(factor == 0 ? TvApp.getApplication().getAutoBitrate() : ((int) factor * 100000), 100000000);
-    }
-
-    public static PopupMenu createPopupMenu(Context context, View view, int gravity) {
-        return new PopupMenu(context, view, gravity);
-    }
-
-    public static int getThemeColor(Context context, int resourceId) {
+    public static int getThemeColor(@NonNull Context context, int resourceId) {
         TypedArray styledAttributes = context.getTheme()
                 .obtainStyledAttributes(new int[]{resourceId});
         int themeColor = styledAttributes.getColor(0, 0);
@@ -180,41 +123,22 @@ public class Utils {
         return themeColor;
     }
 
-    public static void processPasswordEntry(Activity activity, UserDto user) {
-        processPasswordEntry(activity, user, null);
-    }
-
-    public static void processPasswordEntry(final Activity activity, final UserDto user, final String directItemId) {
-        if (get(UserPreferences.class).get(UserPreferences.Companion.getPasswordDPadEnabled())) {
-            Intent pwIntent = new Intent(activity, DpadPwActivity.class);
-            pwIntent.putExtra("User", get(GsonJsonSerializer.class).SerializeToString(user));
-            pwIntent.putExtra("ItemId", directItemId);
-            pwIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-            activity.startActivity(pwIntent);
-        } else {
-            Timber.d("Requesting dialog...");
-            final EditText password = new EditText(activity);
-            password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-            new AlertDialog.Builder(activity)
-                    .setTitle(R.string.password_prompt)
-                    .setMessage(TvApp.getApplication().getString(R.string.password_prompt_message, user.getName()))
-                    .setView(password)
-                    .setPositiveButton(R.string.lbl_ok, new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int whichButton) {
-                            String pw = password.getText().toString();
-                            AuthenticationHelper.loginUser(user.getName(), pw, get(ApiClient.class), activity, directItemId);
-                        }
-                    }).show();
-        }
-    }
-
     public static boolean downMixAudio() {
+        // FIXME: Require context
         AudioManager am = (AudioManager) TvApp.getApplication().getSystemService(Context.AUDIO_SERVICE);
         if (am.isBluetoothA2dpOn()) {
             Timber.i("Downmixing audio due to wired headset");
             return true;
         }
 
-        return (DeviceUtils.isFireTv() && !DeviceUtils.is50()) || get(UserPreferences.class).get(UserPreferences.Companion.getAudioBehaviour()) == AudioBehavior.DOWNMIX_TO_STEREO;
+        return KoinJavaComponent.<UserPreferences>get(UserPreferences.class).get(UserPreferences.Companion.getAudioBehaviour()) == AudioBehavior.DOWNMIX_TO_STEREO;
+    }
+
+    public static long getSafeSeekPosition(long position, long duration) {
+        if (position < 0 || duration < 0)
+            return 0;
+        if (position >= duration)
+            return Math.max(duration - 1000, 0);
+        return position;
     }
 }

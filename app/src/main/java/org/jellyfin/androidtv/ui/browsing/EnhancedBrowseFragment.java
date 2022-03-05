@@ -1,10 +1,10 @@
 package org.jellyfin.androidtv.ui.browsing;
 
+import static org.koin.java.KoinJavaComponent.inject;
+
 import android.content.Intent;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.DisplayMetrics;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -15,7 +15,7 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.leanback.app.BackgroundManager;
+import androidx.fragment.app.FragmentActivity;
 import androidx.leanback.app.RowsSupportFragment;
 import androidx.leanback.widget.ArrayObjectAdapter;
 import androidx.leanback.widget.ClassPresenterSelector;
@@ -32,57 +32,47 @@ import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.constant.CustomMessage;
 import org.jellyfin.androidtv.constant.Extras;
 import org.jellyfin.androidtv.constant.QueryType;
+import org.jellyfin.androidtv.data.model.DataRefreshService;
 import org.jellyfin.androidtv.data.querying.ViewQuery;
-import org.jellyfin.androidtv.preference.UserPreferences;
+import org.jellyfin.androidtv.data.service.BackgroundService;
+import org.jellyfin.androidtv.databinding.EnhancedDetailBrowseBinding;
 import org.jellyfin.androidtv.ui.GridButton;
-import org.jellyfin.androidtv.ui.shared.BaseActivity;
-import org.jellyfin.androidtv.ui.shared.IKeyListener;
-import org.jellyfin.androidtv.ui.shared.IMessageListener;
 import org.jellyfin.androidtv.ui.itemdetail.ItemListActivity;
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher;
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
+import org.jellyfin.androidtv.ui.livetv.LiveTvGuideActivity;
 import org.jellyfin.androidtv.ui.playback.MediaManager;
 import org.jellyfin.androidtv.ui.presentation.CardPresenter;
 import org.jellyfin.androidtv.ui.presentation.GridButtonPresenter;
 import org.jellyfin.androidtv.ui.presentation.PositionableListRowPresenter;
-import org.jellyfin.androidtv.ui.search.SearchActivity;
-import org.jellyfin.androidtv.util.BackgroundManagerExtensionsKt;
+import org.jellyfin.androidtv.ui.shared.BaseActivity;
+import org.jellyfin.androidtv.ui.shared.KeyListener;
+import org.jellyfin.androidtv.ui.shared.MessageListener;
 import org.jellyfin.androidtv.util.InfoLayoutHelper;
 import org.jellyfin.androidtv.util.KeyProcessor;
 import org.jellyfin.androidtv.util.TextUtilsKt;
 import org.jellyfin.apiclient.interaction.EmptyResponse;
-import org.jellyfin.apiclient.interaction.Response;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
 import org.jellyfin.apiclient.model.dto.BaseItemType;
-import org.jellyfin.apiclient.model.entities.DisplayPreferences;
 import org.jellyfin.apiclient.serialization.GsonJsonSerializer;
+import org.koin.java.KoinJavaComponent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
 
 import kotlin.Lazy;
 
-import static org.koin.java.KoinJavaComponent.get;
-import static org.koin.java.KoinJavaComponent.inject;
+public class EnhancedBrowseFragment extends Fragment implements RowLoader {
+    protected FragmentActivity mActivity;
 
-public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
-    private static final int BACKGROUND_UPDATE_DELAY = 100;
-    BaseActivity mActivity;
-    TvApp mApplication;
-
-    TextView mTitle;
-    LinearLayout mInfoRow;
-    TextView mSummary;
+    protected TextView mTitle;
+    private LinearLayout mInfoRow;
+    private TextView mSummary;
 
     protected static final int BY_LETTER = 0;
     protected static final int GENRES = 1;
-    protected static final int YEARS = 2;
-    protected static final int PERSONS = 3;
     protected static final int SUGGESTED = 4;
-    protected static final int SEARCH = 5;
     protected static final int GRID = 6;
     protected static final int ALBUMS = 7;
     protected static final int ARTISTS = 8;
@@ -93,25 +83,21 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
     protected String itemTypeString;
     protected boolean showViews = true;
     protected boolean justLoaded = true;
-    protected boolean ShowFanart = false;
 
     protected BaseRowItem favSongsRowItem;
 
-    private DisplayMetrics mMetrics;
-
-    RowsSupportFragment mRowsFragment;
+    protected RowsSupportFragment mRowsFragment;
     protected CompositeClickedListener mClickedListener = new CompositeClickedListener();
     protected CompositeSelectedListener mSelectedListener = new CompositeSelectedListener();
     protected ArrayObjectAdapter mRowsAdapter;
-    private Timer mBackgroundTimer;
-    private final Handler mHandler = new Handler();
-    private String mBackgroundUrl;
     protected ArrayList<BrowseRowDef> mRows = new ArrayList<>();
-    CardPresenter mCardPresenter;
+    protected CardPresenter mCardPresenter;
     protected BaseRowItem mCurrentItem;
     protected ListRow mCurrentRow;
 
     private Lazy<GsonJsonSerializer> serializer = inject(GsonJsonSerializer.class);
+    private Lazy<BackgroundService> backgroundService = inject(BackgroundService.class);
+    private Lazy<MediaManager> mediaManager = inject(MediaManager.class);
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -127,21 +113,19 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        EnhancedDetailBrowseBinding binding = EnhancedDetailBrowseBinding.inflate(inflater, container, false);
 
-        View root = inflater.inflate(R.layout.enhanced_detail_browse, container, false);
+        mActivity = getActivity();
 
-        mActivity = (BaseActivity) getActivity();
-
-        mTitle = (TextView) root.findViewById(R.id.title);
-        mTitle.setShadowLayer(5, 5, 5, Color.BLACK);
-        mInfoRow = (LinearLayout) root.findViewById(R.id.infoRow);
-        mSummary = (TextView) root.findViewById(R.id.summary);
-        mSummary.setShadowLayer(5, 5, 5, Color.BLACK);
+        mTitle = binding.title;
+        mInfoRow = binding.infoRow;
+        mSummary = binding.summary;
 
         // Inject the RowsSupportFragment in the results container
         if (getChildFragmentManager().findFragmentById(R.id.rowsFragment) == null) {
             mRowsFragment = new RowsSupportFragment();
-            getChildFragmentManager().beginTransaction()
+            getChildFragmentManager()
+                    .beginTransaction()
                     .replace(R.id.rowsFragment, mRowsFragment).commit();
         } else {
             mRowsFragment = (RowsSupportFragment) getChildFragmentManager()
@@ -151,33 +135,26 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
         mRowsAdapter = new ArrayObjectAdapter(new PositionableListRowPresenter());
         mRowsFragment.setAdapter(mRowsAdapter);
 
-        return root;
-
+        return binding.getRoot();
     }
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
-        mApplication = TvApp.getApplication();
-
-        prepareBackgroundManager();
+        backgroundService.getValue().attach(requireActivity());
 
         setupViews();
-
-        setupUIElements();
-
         setupQueries(this);
-
         setupEventListeners();
     }
 
-    protected void setupQueries(IRowLoader rowLoader) {
+    protected void setupQueries(RowLoader rowLoader) {
         rowLoader.loadRows(mRows);
     }
 
     protected void setupViews() {
-        mFolder = serializer.getValue().DeserializeFromString(getActivity().getIntent().getStringExtra(Extras.Folder), BaseItemDto.class);
+        mFolder = serializer.getValue().DeserializeFromString(requireActivity().getIntent().getStringExtra(Extras.Folder), BaseItemDto.class);
         if (mFolder == null) return;
 
         if (mFolder.getCollectionType() != null) {
@@ -200,31 +177,21 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
         } else {
             showViews = false;
         }
-
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (null != mBackgroundTimer) {
-            mBackgroundTimer.cancel();
-        }
     }
 
     @Override
     public void onResume() {
         super.onResume();
 
-        ShowFanart = get(UserPreferences.class).get(UserPreferences.Companion.getBackdropEnabled());
-
-        //React to deletion
-        if (getActivity() != null && !getActivity().isFinishing() && mCurrentRow != null && mCurrentItem != null && mCurrentItem.getItemId() != null && mCurrentItem.getItemId().equals(TvApp.getApplication().dataRefreshService.getLastDeletedItemId())) {
-            ((ItemRowAdapter)mCurrentRow.getAdapter()).remove(mCurrentItem);
-            TvApp.getApplication().dataRefreshService.setLastDeletedItemId(null);
+        // React to deletion
+        DataRefreshService dataRefreshService = KoinJavaComponent.<DataRefreshService>get(DataRefreshService.class);
+        if (getActivity() != null && !getActivity().isFinishing() && mCurrentRow != null && mCurrentItem != null && mCurrentItem.getItemId() != null && mCurrentItem.getItemId().equals(dataRefreshService.getLastDeletedItemId())) {
+            ((ItemRowAdapter) mCurrentRow.getAdapter()).remove(mCurrentItem);
+            dataRefreshService.setLastDeletedItemId(null);
         }
 
         if (!justLoaded) {
-            //Re-retrieve anything that needs it but delay slightly so we don't take away gui landing
+            // Re-retrieve anything that needs it but delay slightly so we don't take away gui landing
             if (mRowsAdapter != null) {
                 refreshCurrentItem();
                 new Handler().postDelayed(new Runnable() {
@@ -241,20 +208,17 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
                     }
                 }, 1500);
             }
-
         } else {
             justLoaded = false;
         }
     }
 
     public void loadRows(List<BrowseRowDef> rows) {
-
         mRowsAdapter = new ArrayObjectAdapter(new PositionableListRowPresenter());
         mCardPresenter = new CardPresenter(false, 280);
         ClassPresenterSelector ps = new ClassPresenterSelector();
         ps.addClassPresenter(BaseRowItem.class, mCardPresenter);
         ps.addClassPresenter(GridButton.class, new GridButtonPresenter(false, 310, 280));
-
 
         for (BrowseRowDef def : rows) {
             HeaderItem header = new HeaderItem(def.getHeaderText());
@@ -318,69 +282,62 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
         addAdditionalRows(mRowsAdapter);
 
         mRowsFragment.setAdapter(mRowsAdapter);
-
     }
 
     protected void addAdditionalRows(ArrayObjectAdapter rowAdapter) {
-        if (showViews) {
-            HeaderItem gridHeader = new HeaderItem(rowAdapter.size(), mApplication.getString(R.string.lbl_views));
+        if (!showViews) return;
 
-            GridButtonPresenter mGridPresenter = new GridButtonPresenter();
-            ArrayObjectAdapter gridRowAdapter = new ArrayObjectAdapter(mGridPresenter);
-            switch (itemTypeString) {
-                case "Movie":
-                    gridRowAdapter.add(new GridButton(SUGGESTED, mApplication.getString(R.string.lbl_suggested), R.drawable.tile_suggestions));
-                    addStandardViewButtons(gridRowAdapter);
-                    break;
-                case "MusicAlbum":
-                    gridRowAdapter.add(new GridButton(ALBUMS, TvApp.getApplication().getString(R.string.lbl_albums), R.drawable.tile_audio));
-                    gridRowAdapter.add(new GridButton(ARTISTS, TvApp.getApplication().getString(R.string.lbl_artists), R.drawable.tile_artists));
-                    gridRowAdapter.add(new GridButton(GENRES, mApplication.getString(R.string.lbl_genres), R.drawable.tile_genres));
-                    gridRowAdapter.add(new GridButton(SEARCH, mApplication.getString(R.string.lbl_search), R.drawable.tile_search));
-                    break;
-                default:
-                    addStandardViewButtons(gridRowAdapter);
-                    break;
-            }
-            rowAdapter.add(new ListRow(gridHeader, gridRowAdapter));
+        HeaderItem gridHeader = new HeaderItem(rowAdapter.size(), getString(R.string.lbl_views));
+        GridButtonPresenter mGridPresenter = new GridButtonPresenter();
+        ArrayObjectAdapter gridRowAdapter = new ArrayObjectAdapter(mGridPresenter);
 
+        switch (itemTypeString) {
+            case "Movie":
+                gridRowAdapter.add(new GridButton(SUGGESTED, getString(R.string.lbl_suggested), R.drawable.tile_suggestions, null));
+                addStandardViewButtons(gridRowAdapter);
+                break;
+
+            case "MusicAlbum":
+                gridRowAdapter.add(new GridButton(ALBUMS, getString(R.string.lbl_albums), R.drawable.tile_audio, null));
+                gridRowAdapter.add(new GridButton(ARTISTS, getString(R.string.lbl_artists), R.drawable.tile_artists, null));
+                gridRowAdapter.add(new GridButton(GENRES, getString(R.string.lbl_genres), R.drawable.tile_genres, null));
+                break;
+
+            default:
+                addStandardViewButtons(gridRowAdapter);
+                break;
         }
 
+        rowAdapter.add(new ListRow(gridHeader, gridRowAdapter));
     }
 
     protected void addStandardViewButtons(ArrayObjectAdapter gridRowAdapter) {
-        gridRowAdapter.add(new GridButton(GRID, TvApp.getApplication().getString(R.string.lbl_all_items), R.drawable.tile_port_grid));
-        gridRowAdapter.add(new GridButton(BY_LETTER, mApplication.getString(R.string.lbl_by_letter), R.drawable.tile_letters));
-        gridRowAdapter.add(new GridButton(GENRES, mApplication.getString(R.string.lbl_genres), R.drawable.tile_genres));
-        //gridRowAdapter.add(new GridButton(PERSONS, mApplication.getString(R.string.lbl_performers), R.drawable.tile_actors));
-        gridRowAdapter.add(new GridButton(SEARCH, mApplication.getString(R.string.lbl_search), R.drawable.tile_search));
-
-    }
-
-    protected void setupUIElements() {
+        gridRowAdapter.add(new GridButton(GRID, getString(R.string.lbl_all_items), R.drawable.tile_port_grid, null));
+        gridRowAdapter.add(new GridButton(BY_LETTER, getString(R.string.lbl_by_letter), R.drawable.tile_letters, null));
+        gridRowAdapter.add(new GridButton(GENRES, getString(R.string.lbl_genres), R.drawable.tile_genres, null));
+        // Disabled because the screen doesn't behave properly
+        // gridRowAdapter.add(new GridButton(PERSONS, getString(R.string.lbl_performers), R.drawable.tile_actors));
     }
 
     protected void setupEventListeners() {
-
         mRowsFragment.setOnItemViewClickedListener(mClickedListener);
         mClickedListener.registerListener(new ItemViewClickedListener());
         if (showViews) mClickedListener.registerListener(new SpecialViewClickedListener());
 
         mRowsFragment.setOnItemViewSelectedListener(mSelectedListener);
         mSelectedListener.registerListener(new ItemViewSelectedListener());
-        if (mActivity != null) {
-            mActivity.registerKeyListener(new IKeyListener() {
+        if (mActivity != null && mActivity instanceof BaseActivity) {
+            ((BaseActivity) mActivity).registerKeyListener(new KeyListener() {
                 @Override
                 public boolean onKeyUp(int key, KeyEvent event) {
-                    return KeyProcessor.HandleKey(key, mCurrentItem, mActivity);
+                    return KeyProcessor.HandleKey(key, mCurrentItem, ((BaseActivity) mActivity));
                 }
             });
 
-            mActivity.registerMessageListener(new IMessageListener() {
+            ((BaseActivity) mActivity).registerMessageListener(new MessageListener() {
                 @Override
                 public void onMessageReceived(CustomMessage message) {
                     switch (message) {
-
                         case RefreshCurrentItem:
                             refreshCurrentItem();
                             break;
@@ -391,8 +348,12 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
     }
 
     private void refreshCurrentItem() {
-        if (mCurrentItem != null && mCurrentItem.getBaseItemType() != BaseItemType.Photo && mCurrentItem.getBaseItemType() != BaseItemType.MusicArtist
-                && mCurrentItem.getBaseItemType() != BaseItemType.MusicAlbum && mCurrentItem.getBaseItemType() != BaseItemType.Playlist) {
+        if (mCurrentItem != null &&
+                mCurrentItem.getBaseItemType() != BaseItemType.Photo &&
+                mCurrentItem.getBaseItemType() != BaseItemType.MusicArtist &&
+                mCurrentItem.getBaseItemType() != BaseItemType.MusicAlbum &&
+                mCurrentItem.getBaseItemType() != BaseItemType.Playlist
+        ) {
             mCurrentItem.refresh(new EmptyResponse() {
                 @Override
                 public void onResponse() {
@@ -400,69 +361,54 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
                     adapter.notifyArrayItemRangeChanged(adapter.indexOf(mCurrentItem), 1);
                 }
             });
-
         }
-
     }
 
     private final class SpecialViewClickedListener implements OnItemViewClickedListener {
         @Override
-        public void onItemClicked(Presenter.ViewHolder itemViewHolder, Object item,
-                                  RowPresenter.ViewHolder rowViewHolder, Row row) {
-
+        public void onItemClicked(Presenter.ViewHolder itemViewHolder, Object item, RowPresenter.ViewHolder rowViewHolder, Row row) {
             if (item instanceof GridButton) {
                 switch (((GridButton) item).getId()) {
                     case GRID:
-                        TvApp.getApplication().getDisplayPrefsAsync(mFolder.getDisplayPreferencesId(), new Response<DisplayPreferences>() {
-                            @Override
-                            public void onResponse(DisplayPreferences response) {
-                                Intent folderIntent = new Intent(getActivity(), GenericGridActivity.class);
-                                folderIntent.putExtra(Extras.Folder, serializer.getValue().SerializeToString(mFolder));
-                                getActivity().startActivity(folderIntent);
-                            }
-                        });
+                        Intent folderIntent = new Intent(getActivity(), GenericGridActivity.class);
+                        folderIntent.putExtra(Extras.Folder, serializer.getValue().SerializeToString(mFolder));
+                        requireActivity().startActivity(folderIntent);
                         break;
 
                     case ALBUMS:
-                        mFolder.setDisplayPreferencesId(mFolder.getId()+"AL");
-                        TvApp.getApplication().getDisplayPrefsAsync(mFolder.getDisplayPreferencesId(), new Response<DisplayPreferences>() {
-                            @Override
-                            public void onResponse(DisplayPreferences response) {
-                                Intent folderIntent = new Intent(getActivity(), GenericGridActivity.class);
-                                folderIntent.putExtra(Extras.Folder, serializer.getValue().SerializeToString(mFolder));
-                                folderIntent.putExtra(Extras.IncludeType, "MusicAlbum");
-                                getActivity().startActivity(folderIntent);
-                            }
-                        });
+                        mFolder.setDisplayPreferencesId(mFolder.getId() + "AL");
+
+                        Intent albumsIntent = new Intent(getActivity(), GenericGridActivity.class);
+                        albumsIntent.putExtra(Extras.Folder, serializer.getValue().SerializeToString(mFolder));
+                        albumsIntent.putExtra(Extras.IncludeType, "MusicAlbum");
+                        requireActivity().startActivity(albumsIntent);
                         break;
 
                     case ARTISTS:
-                        mFolder.setDisplayPreferencesId(mFolder.getId()+"AR");
-                        TvApp.getApplication().getDisplayPrefsAsync(mFolder.getDisplayPreferencesId(), new Response<DisplayPreferences>() {
-                            @Override
-                            public void onResponse(DisplayPreferences response) {
-                                Intent folderIntent = new Intent(getActivity(), GenericGridActivity.class);
-                                folderIntent.putExtra(Extras.Folder, serializer.getValue().SerializeToString(mFolder));
-                                folderIntent.putExtra(Extras.IncludeType, "AlbumArtist");
-                                getActivity().startActivity(folderIntent);
-                            }
-                        });
+                        mFolder.setDisplayPreferencesId(mFolder.getId() + "AR");
+
+                        Intent artistsIntent = new Intent(getActivity(), GenericGridActivity.class);
+                        artistsIntent.putExtra(GroupedItemsActivity.EXTRA_FOLDER, serializer.getValue().SerializeToString(mFolder));
+                        artistsIntent.putExtra(GroupedItemsActivity.EXTRA_INCLUDE_TYPE, "AlbumArtist");
+                        requireActivity().startActivity(artistsIntent);
                         break;
 
                     case BY_LETTER:
-                        Intent intent = new Intent(getActivity(), ByLetterActivity.class);
-                        intent.putExtra(Extras.Folder, serializer.getValue().SerializeToString(mFolder));
-                        intent.putExtra(Extras.IncludeType, itemTypeString);
+                        Intent letterIntent = new Intent(getActivity(), GroupedItemsActivity.class);
+                        letterIntent.putExtra(GroupedItemsActivity.EXTRA_GROUPING_TYPE, GroupedItemsActivity.GroupingType.LETTER.toString());
+                        letterIntent.putExtra(GroupedItemsActivity.EXTRA_FOLDER, serializer.getValue().SerializeToString(mFolder));
+                        letterIntent.putExtra(GroupedItemsActivity.EXTRA_INCLUDE_TYPE, itemTypeString);
 
-                        getActivity().startActivity(intent);
+                        requireActivity().startActivity(letterIntent);
                         break;
 
                     case GENRES:
-                        Intent genreIntent = new Intent(getActivity(), ByGenreActivity.class);
-                        genreIntent.putExtra(Extras.Folder, serializer.getValue().SerializeToString(mFolder));
-                        genreIntent.putExtra(Extras.IncludeType, itemTypeString);
+                        Intent genreIntent = new Intent(getActivity(), GroupedItemsActivity.class);
+                        genreIntent.putExtra(GroupedItemsActivity.EXTRA_GROUPING_TYPE, GroupedItemsActivity.GroupingType.GENRE.toString());
+                        genreIntent.putExtra(GroupedItemsActivity.EXTRA_FOLDER, serializer.getValue().SerializeToString(mFolder));
+                        genreIntent.putExtra(GroupedItemsActivity.EXTRA_INCLUDE_TYPE, itemTypeString);
 
-                        getActivity().startActivity(genreIntent);
+                        requireActivity().startActivity(genreIntent);
                         break;
 
                     case SUGGESTED:
@@ -470,22 +416,7 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
                         suggIntent.putExtra(Extras.Folder, serializer.getValue().SerializeToString(mFolder));
                         suggIntent.putExtra(Extras.IncludeType, itemTypeString);
 
-                        getActivity().startActivity(suggIntent);
-                        break;
-
-                    case PERSONS:
-                        Intent personIntent = new Intent(getActivity(), BrowsePersonsActivity.class);
-                        personIntent.putExtra(Extras.Folder, serializer.getValue().SerializeToString(mFolder));
-                        personIntent.putExtra(Extras.IncludeType, itemTypeString);
-
-                        getActivity().startActivity(personIntent);
-                        break;
-
-                    case SEARCH:
-                        Intent searchIntent = new Intent(getActivity(), SearchActivity.class);
-                        searchIntent.putExtra("MusicOnly", "MusicAlbum".equals(itemTypeString));
-
-                        startActivity(searchIntent);
+                        requireActivity().startActivity(suggIntent);
                         break;
 
                     case FAVSONGS:
@@ -493,7 +424,7 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
                         favIntent.putExtra("ItemId", ItemListActivity.FAV_SONGS);
                         favIntent.putExtra("ParentId", mFolder.getId());
 
-                        getActivity().startActivity(favIntent);
+                        requireActivity().startActivity(favIntent);
                         break;
 
                     case SERIES:
@@ -505,40 +436,44 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
                         seriesTimers.setName(mActivity.getString(R.string.lbl_series_recordings));
                         seriesIntent.putExtra(Extras.Folder, serializer.getValue().SerializeToString(seriesTimers));
 
-                        getActivity().startActivity(seriesIntent);
+                        requireActivity().startActivity(seriesIntent);
                         break;
 
                     case SCHEDULE:
                     case TvApp.LIVE_TV_SCHEDULE_OPTION_ID:
                         Intent schedIntent = new Intent(mActivity, BrowseScheduleActivity.class);
-                        getActivity().startActivity(schedIntent);
+                        requireActivity().startActivity(schedIntent);
                         break;
 
                     case TvApp.LIVE_TV_RECORDINGS_OPTION_ID:
                         Intent recordings = new Intent(mActivity, BrowseRecordingsActivity.class);
                         BaseItemDto folder = new BaseItemDto();
                         folder.setId("");
-                        folder.setName(TvApp.getApplication().getResources().getString(R.string.lbl_recorded_tv));
+                        folder.setName(getString(R.string.lbl_recorded_tv));
                         recordings.putExtra(Extras.Folder, serializer.getValue().SerializeToString(folder));
                         mActivity.startActivity(recordings);
                         break;
 
+                    case TvApp.LIVE_TV_GUIDE_OPTION_ID:
+                        Intent guide = new Intent(mActivity, LiveTvGuideActivity.class);
+                        mActivity.startActivity(guide);
+                        break;
+
                     default:
-                        Toast.makeText(getActivity(), item.toString() + mApplication.getString(R.string.msg_not_implemented), Toast.LENGTH_SHORT)
-                                .show();
+                        Toast.makeText(getActivity(), item.toString() + getString(R.string.msg_not_implemented), Toast.LENGTH_SHORT).show();
                         break;
                 }
             }
         }
     }
+
     private final class ItemViewClickedListener implements OnItemViewClickedListener {
         @Override
-        public void onItemClicked(final Presenter.ViewHolder itemViewHolder, Object item,
-                                  RowPresenter.ViewHolder rowViewHolder, Row row) {
-
+        public void onItemClicked(final Presenter.ViewHolder itemViewHolder, Object item, RowPresenter.ViewHolder rowViewHolder, Row row) {
             if (!(item instanceof BaseRowItem)) return;
-            MediaManager.setCurrentMediaTitle(row.getHeaderItem().getName());
-            ItemLauncher.launch((BaseRowItem) item, (ItemRowAdapter) ((ListRow)row).getAdapter(), ((BaseRowItem)item).getIndex(), getActivity());
+
+            mediaManager.getValue().setCurrentMediaTitle(row.getHeaderItem().getName());
+            ItemLauncher.launch((BaseRowItem) item, (ItemRowAdapter) ((ListRow) row).getAdapter(), ((BaseRowItem) item).getIndex(), getActivity());
         }
     }
 
@@ -546,9 +481,8 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
         @Override
         public void onItemSelected(Presenter.ViewHolder itemViewHolder, Object item,
                                    RowPresenter.ViewHolder rowViewHolder, Row row) {
-            mHandler.removeCallbacks(updateContentTask);
-            if (item instanceof GridButton && ((GridButton)item).getId() == FAVSONGS) {
-                //set to specialized item
+            if (item instanceof GridButton && ((GridButton) item).getId() == FAVSONGS) {
+                // Set to specialized item
                 mCurrentItem = favSongsRowItem;
             }
 
@@ -556,9 +490,8 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
                 mTitle.setText(mFolder != null ? mFolder.getName() : "");
                 mInfoRow.removeAllViews();
                 mSummary.setText("");
-                //fill in default background
-                mBackgroundUrl = null;
-                startBackgroundTimer();
+                // Fill in default background
+                backgroundService.getValue().clearBackgrounds();
                 return;
             }
 
@@ -566,83 +499,20 @@ public class EnhancedBrowseFragment extends Fragment implements IRowLoader {
 
             mCurrentItem = rowItem;
             mCurrentRow = (ListRow) row;
-            mTitle.setText(mCurrentItem.getName());
             mInfoRow.removeAllViews();
-            mSummary.setText("");
-            mHandler.postDelayed(updateContentTask, 500);
 
-            //mApplication.getLogger().Debug("Selected Item "+rowItem.getIndex() + " type: "+ (rowItem.getItemType().equals(BaseRowItem.ItemType.BaseItem) ? rowItem.getBaseItem().getType() : "other"));
-            ItemRowAdapter adapter = (ItemRowAdapter) ((ListRow)row).getAdapter();
-            adapter.loadMoreItemsIfNeeded(rowItem.getIndex());
+            mTitle.setText(rowItem.getName(requireContext()));
 
-            if (ShowFanart) {
-                mBackgroundUrl = rowItem.getBackdropImageUrl();
-                startBackgroundTimer();
-            }
-
-        }
-    }
-
-    protected Runnable updateContentTask = new Runnable() {
-        @Override
-        public void run() {
-            if (mCurrentItem == null) return;
-            mTitle.setText(mCurrentItem.getName());
-
-            String summary = mCurrentItem.getSummary();
+            String summary = rowItem.getSummary(requireContext());
             if (summary != null) mSummary.setText(TextUtilsKt.toHtmlSpanned(summary));
             else mSummary.setText(null);
 
-            InfoLayoutHelper.addInfoRow(mActivity, mCurrentItem, mInfoRow, true, true);
-        }
-    };
+            InfoLayoutHelper.addInfoRow(requireContext(), rowItem, mInfoRow, true, true);
 
-    private void prepareBackgroundManager() {
-        final BackgroundManager backgroundManager = BackgroundManager.getInstance(getActivity());
-        backgroundManager.attach(getActivity().getWindow());
+            ItemRowAdapter adapter = (ItemRowAdapter) ((ListRow) row).getAdapter();
+            adapter.loadMoreItemsIfNeeded(rowItem.getIndex());
 
-        mMetrics = new DisplayMetrics();
-        getActivity().getWindowManager().getDefaultDisplay().getMetrics(mMetrics);
-    }
-
-    protected void updateBackground(String url) {
-        if (url == null) {
-            clearBackground();
-        } else {
-            BackgroundManagerExtensionsKt.drawable(
-                    BackgroundManager.getInstance(getActivity()),
-                    getActivity(),
-                    url,
-                    mMetrics.widthPixels,
-                    mMetrics.heightPixels
-            );
+            backgroundService.getValue().setBackground(rowItem.getBaseItem());
         }
     }
-
-    protected void clearBackground() {
-        BackgroundManager.getInstance(getActivity()).setDrawable(null);
-    }
-
-    private void startBackgroundTimer() {
-        if (null != mBackgroundTimer) {
-            mBackgroundTimer.cancel();
-        }
-        mBackgroundTimer = new Timer();
-        mBackgroundTimer.schedule(new UpdateBackgroundTask(), BACKGROUND_UPDATE_DELAY);
-    }
-
-    private class UpdateBackgroundTask extends TimerTask {
-
-        @Override
-        public void run() {
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    updateBackground(mBackgroundUrl);
-                }
-            });
-
-        }
-    }
-
 }

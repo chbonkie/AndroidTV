@@ -1,21 +1,31 @@
 package org.jellyfin.androidtv.ui.preference.category
 
 import android.os.Build
+import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.preference.dsl.OptionsScreen
-import org.jellyfin.androidtv.ui.preference.dsl.info
-import org.jellyfin.androidtv.util.Utils
+import org.jellyfin.androidtv.ui.preference.dsl.link
+import org.jellyfin.androidtv.ui.preference.screen.LicensesScreen
 
 fun OptionsScreen.aboutCategory() = category {
 	setTitle(R.string.pref_about_title)
 
-	info {
-		setTitle(R.string.lbl_version)
-		content = Utils.getVersionString()
+	link {
+		title = "Jellyfin app version"
+		content = BuildConfig.VERSION_NAME
+		icon = R.drawable.ic_jellyfin
 	}
 
-	info {
+	link {
 		setTitle(R.string.pref_device_model)
 		content = "${Build.MANUFACTURER} ${Build.MODEL}"
+		icon = R.drawable.ic_tv
+	}
+
+	link {
+		setTitle(R.string.licenses_link)
+		setContent(R.string.licenses_link_description)
+		icon = R.drawable.ic_guide
+		withFragment<LicensesScreen>()
 	}
 }

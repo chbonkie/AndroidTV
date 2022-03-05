@@ -1,23 +1,43 @@
-import java.util.*
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
+// Application
 include(":app")
 
-// Load properties from local.properties
-val properties = Properties().apply {
-	val location = File("local.properties")
-	if (location.exists())
-		load(location.inputStream())
+// Modules
+include(":playback")
+
+pluginManagement {
+	repositories {
+		gradlePluginPortal()
+		mavenCentral()
+		google()
+	}
 }
 
-// Get value for dependency substitution
-val enableDependencySubstitution = properties.getProperty("enable.dependency.substitution", "true").equals("true", true)
+dependencyResolutionManagement {
+	repositories {
+		mavenCentral()
+		google()
 
-// Replace apiclient dependency with local version
-val apiclientLocation = "../jellyfin-apiclient-java"
-if (File(apiclientLocation).exists() && enableDependencySubstitution) {
-	includeBuild(apiclientLocation) {
-		dependencySubstitution {
-			substitute(module("org.jellyfin.apiclient:android")).with(project(":android"))
+		// Jellyfin SDK
+		mavenLocal {
+			content {
+				includeVersionByRegex("org.jellyfin.sdk", ".*", "latest-SNAPSHOT")
+			}
+		}
+		maven("https://s01.oss.sonatype.org/content/repositories/snapshots/") {
+			content {
+				includeVersionByRegex("org.jellyfin.sdk", ".*", "master-SNAPSHOT")
+				includeVersionByRegex("org.jellyfin.sdk", ".*", "openapi-unstable-SNAPSHOT")
+			}
+		}
+
+		// Jellyfin apiclient
+		maven("https://jitpack.io") {
+			content {
+				// Only allow legacy apiclient
+				includeVersionByRegex("com.github.jellyfin.jellyfin-sdk-kotlin", ".*", "v0.7.10")
+			}
 		}
 	}
 }

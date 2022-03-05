@@ -5,4 +5,4 @@ local.properties
 /.idea
 .gradle
 build/
-/captures
+captures/

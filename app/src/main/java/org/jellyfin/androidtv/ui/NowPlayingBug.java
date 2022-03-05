@@ -1,5 +1,7 @@
 package org.jellyfin.androidtv.ui;
 
+import static org.koin.java.KoinJavaComponent.inject;
+
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
@@ -13,17 +15,16 @@ import android.widget.TextView;
 import com.bumptech.glide.Glide;
 
 import org.jellyfin.androidtv.R;
-import org.jellyfin.androidtv.TvApp;
+import org.jellyfin.androidtv.databinding.NowPlayingBugBinding;
 import org.jellyfin.androidtv.ui.playback.AudioEventListener;
 import org.jellyfin.androidtv.ui.playback.AudioNowPlayingActivity;
 import org.jellyfin.androidtv.ui.playback.MediaManager;
 import org.jellyfin.androidtv.ui.playback.PlaybackController;
 import org.jellyfin.androidtv.util.ImageUtils;
 import org.jellyfin.androidtv.util.TimeUtils;
-import org.jellyfin.apiclient.interaction.ApiClient;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
 
-import static org.koin.java.KoinJavaComponent.get;
+import kotlin.Lazy;
 
 public class NowPlayingBug extends FrameLayout {
     ImageView npIcon;
@@ -31,6 +32,7 @@ public class NowPlayingBug extends FrameLayout {
     TextView npStatus;
     String currentDuration;
     Context context;
+    private Lazy<MediaManager> mediaManager = inject(MediaManager.class);
 
     public NowPlayingBug(Context context) {
         super(context);
@@ -45,20 +47,17 @@ public class NowPlayingBug extends FrameLayout {
     private void init(Context context) {
         this.context = context;
         LayoutInflater inflater = LayoutInflater.from(context);
-        View v = inflater.inflate(R.layout.now_playing_bug, null, false);
-        this.addView(v);
+        NowPlayingBugBinding binding = NowPlayingBugBinding.inflate(inflater, this, true);
         if (!isInEditMode()) {
-            npIcon = (ImageView)v.findViewById(R.id.npIcon);
-            npDesc = ((TextView) v.findViewById(R.id.npDesc));
-            npStatus = ((TextView) v.findViewById(R.id.npStatus));
+            npIcon = binding.npIcon;
+            npDesc = binding.npDesc;
+            npStatus = binding.npStatus;
             this.setFocusable(true);
             this.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    if (TvApp.getApplication().getCurrentActivity() != null) {
-                        Intent np = new Intent(TvApp.getApplication(), AudioNowPlayingActivity.class);
-                        TvApp.getApplication().getCurrentActivity().startActivity(np);
-                    }
+                    Intent np = new Intent(context, AudioNowPlayingActivity.class);
+                    context.startActivity(np);
                 }
             });
         }
@@ -78,7 +77,14 @@ public class NowPlayingBug extends FrameLayout {
     AudioEventListener listener = new AudioEventListener() {
         @Override
         public void onPlaybackStateChange(PlaybackController.PlaybackState newState, BaseItemDto currentItem) {
-            if (newState == PlaybackController.PlaybackState.PLAYING && currentItem != null) setInfo(currentItem);
+            if (currentItem == null)
+                return;
+
+            if (newState == PlaybackController.PlaybackState.PLAYING) {
+                setInfo(currentItem);
+            } else if (newState == PlaybackController.PlaybackState.IDLE && isShown()) {
+                setStatus(mediaManager.getValue().getCurrentAudioPosition());
+            }
         }
 
         @Override
@@ -90,8 +96,8 @@ public class NowPlayingBug extends FrameLayout {
         public void onQueueStatusChanged(boolean hasQueue) {
             if (hasQueue) {
                 // may have just added one so update display
-                setInfo(MediaManager.getCurrentAudioItem());
-                setStatus(MediaManager.getCurrentAudioPosition());
+                setInfo(mediaManager.getValue().getCurrentAudioItem());
+                setStatus(mediaManager.getValue().getCurrentAudioPosition());
                 setVisibility(VISIBLE);
             } else {
                 setVisibility(GONE);
@@ -104,10 +110,10 @@ public class NowPlayingBug extends FrameLayout {
         super.onAttachedToWindow();
         if (!isInEditMode()) {
             // hook our events
-            MediaManager.addAudioEventListener(listener);
+            mediaManager.getValue().addAudioEventListener(listener);
             if (manageVisibility()) {
-                setInfo(MediaManager.getCurrentAudioItem());
-                setStatus(MediaManager.getCurrentAudioPosition());
+                setInfo(mediaManager.getValue().getCurrentAudioItem());
+                setStatus(mediaManager.getValue().getCurrentAudioPosition());
             }
         }
     }
@@ -117,14 +123,18 @@ public class NowPlayingBug extends FrameLayout {
         super.onDetachedFromWindow();
         if (!isInEditMode()) {
             // unhook our events
-            MediaManager.removeAudioEventListener(listener);
+            mediaManager.getValue().removeAudioEventListener(listener);
         }
     }
 
     private void setInfo(BaseItemDto item) {
         if (item == null) return;
 
-        Glide.with(context).load(ImageUtils.getPrimaryImageUrl(item, get(ApiClient.class))).error(R.drawable.ic_album).override(35, 35).centerInside().into(npIcon);
+        Glide.with(context)
+                .load(ImageUtils.getPrimaryImageUrl(item))
+                .error(R.drawable.ic_album)
+                .centerInside()
+                .into(npIcon);
         currentDuration = TimeUtils.formatMillis(item.getRunTimeTicks() != null ? item.getRunTimeTicks() / 10000 : 0);
         npDesc.setText(item.getAlbumArtist() != null ? item.getAlbumArtist() : item.getName());
     }
@@ -134,8 +144,8 @@ public class NowPlayingBug extends FrameLayout {
     }
 
     public boolean manageVisibility() {
-        this.setVisibility(MediaManager.hasAudioQueueItems() ? VISIBLE : GONE);
-        return MediaManager.hasAudioQueueItems();
+        this.setVisibility(mediaManager.getValue().hasAudioQueueItems() ? VISIBLE : GONE);
+        return mediaManager.getValue().hasAudioQueueItems();
     }
 
     public void showDescription(boolean show) {

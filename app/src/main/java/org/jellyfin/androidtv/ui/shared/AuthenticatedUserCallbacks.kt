@@ -1,59 +1,41 @@
 package org.jellyfin.androidtv.ui.shared
 
 import android.app.Activity
-import android.app.Application
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
-
-import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.ui.startup.DpadPwActivity
-import org.jellyfin.androidtv.ui.startup.SelectServerActivity
-import org.jellyfin.androidtv.ui.startup.SelectUserActivity
+import org.jellyfin.androidtv.auth.SessionRepository
+import org.jellyfin.androidtv.ui.preference.PreferencesActivity
 import org.jellyfin.androidtv.ui.startup.StartupActivity
-
-private const val LOG_TAG = "AuthUserCallbacks"
+import timber.log.Timber
 
 /**
  * ActivityLifecycleCallback that bounces to the StartupActivity if an Activity is created and
  * the currentUser is null.
  */
-class AuthenticatedUserCallbacks : Application.ActivityLifecycleCallbacks {
-	override fun onActivityPaused(activity: Activity) {
+class AuthenticatedUserCallbacks(
+	private val sessionRepository: SessionRepository,
+) : AbstractActivityLifecycleCallbacks() {
+	companion object {
+		val ignoredClassNames = arrayOf(
+			// Startup activities
+			StartupActivity::class.qualifiedName,
+			PreferencesActivity::class.qualifiedName,
+			// Third party
+			org.acra.dialog.CrashReportDialog::class.qualifiedName,
+			// Screensaver activity is not exposed in Android SDK
+			"android.service.dreams.DreamActivity"
+		)
 	}
 
-	override fun onActivityStarted(activity: Activity) {
-	}
+	override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+		val name = activity::class.qualifiedName
 
-	override fun onActivityDestroyed(activity: Activity) {
-	}
-
-	override fun onActivitySaveInstanceState(activity: Activity, bundle: Bundle) {
-	}
-
-	override fun onActivityStopped(activity: Activity) {
-	}
-
-	override fun onActivityCreated(activity: Activity, bundle: Bundle?) {
-		when (activity) {
-			// Ignore startup activities
-			is DpadPwActivity,
-			is SelectServerActivity,
-			is SelectUserActivity,
-			is StartupActivity -> return
-			// All other activities should have a current user
-			else -> {
-				TvApp.getApplication().apply {
-					if (currentUser == null) {
-						Log.w(LOG_TAG, "Current user is null, bouncing to StartupActivity")
-						activity.startActivity(Intent(this, StartupActivity::class.java))
-						activity.finish()
-					}
-				}
-			}
+		if (name in ignoredClassNames) {
+			Timber.i("Activity $name is ignored")
+		} else if (sessionRepository.currentSession.value == null) {
+			Timber.w("Activity $name started without a session, bouncing to StartupActivity")
+			activity.startActivity(Intent(activity, StartupActivity::class.java))
+			activity.finish()
 		}
-	}
-
-	override fun onActivityResumed(activity: Activity) {
 	}
 }

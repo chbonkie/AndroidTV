@@ -1,109 +1,160 @@
 plugins {
 	id("com.android.application")
 	kotlin("android")
-	kotlin("android.extensions")
+	kotlin("kapt")
+	alias(libs.plugins.kotlin.serialization)
+	alias(libs.plugins.aboutlibraries)
 }
 
 android {
-	compileSdkVersion(29)
-	// Explicitly specify ndk version for Azure
-	// Can be removed when version 4.1.x of the Android Gradle plugin is released
-	ndkVersion = "21.3.6528147"
+	namespace = "org.jellyfin.androidtv"
+	compileSdk = 31
 
 	defaultConfig {
-		// Android version targets
-		minSdkVersion(21)
-		targetSdkVersion(29)
+		minSdk = 21
+		targetSdk = 31
 
 		// Release version
+		applicationId = namespace
 		versionName = project.getVersionName()
-		versionCode = getVersionCode(versionName)
+		versionCode = getVersionCode(versionName!!)
+		setProperty("archivesBaseName", "jellyfin-androidtv-v$versionName")
+	}
+
+	sourceSets["main"].java.srcDirs("src/main/kotlin")
+	sourceSets["test"].java.srcDirs("src/test/kotlin")
+
+	buildFeatures {
+		viewBinding = true
 	}
 
 	compileOptions {
-		// Use Java 1.8 features
-		sourceCompatibility = JavaVersion.VERSION_1_8
-		targetCompatibility = JavaVersion.VERSION_1_8
-	}
-
-	kotlinOptions {
-		jvmTarget = compileOptions.targetCompatibility.toString()
+		isCoreLibraryDesugaringEnabled = true
 	}
 
 	buildTypes {
-		getByName("release") {
+		val release by getting {
 			isMinifyEnabled = false
-			proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+
+			// Set package names used in various XML files
+			resValue("string", "app_id", namespace!!)
+			resValue("string", "app_search_suggest_authority", "${namespace}.content")
+			resValue("string", "app_search_suggest_intent_data", "content://${namespace}.content/intent")
+
+			// Set flavored application name
 			resValue("string", "app_name", "@string/app_name_release")
+
+			buildConfigField("boolean", "DEVELOPMENT", "false")
 		}
 
-		getByName("debug") {
+		val debug by getting {
 			// Use different application id to run release and debug at the same time
 			applicationIdSuffix = ".debug"
+
+			// Set package names used in various XML files
+			resValue("string", "app_id", namespace + applicationIdSuffix)
+			resValue("string", "app_search_suggest_authority", "${namespace + applicationIdSuffix}.content")
+			resValue("string", "app_search_suggest_intent_data", "content://${namespace + applicationIdSuffix}.content/intent")
+
+			// Set flavored application name
 			resValue("string", "app_name", "@string/app_name_debug")
+
+			buildConfigField("boolean", "DEVELOPMENT", (defaultConfig.versionCode!! < 100).toString())
 		}
 	}
 
-	applicationVariants.all {
-		val variant = this
-		variant.outputs.all {
-			val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-			output.outputFileName = output.outputFileName
-				.replace("app-", "jellyfin-androidtv_")
-				.replace(".apk", "_v${variant.versionName}.apk")
-		}
+	lint {
+		lintConfig = file("$rootDir/android-lint.xml")
+		abortOnError = false
+		sarifReport = true
+		checkDependencies = true
+	}
+
+	testOptions.unitTests.all {
+		it.useJUnitPlatform()
+	}
+}
+
+val versionTxt by tasks.registering {
+	val path = buildDir.resolve("version.txt")
+
+	doLast {
+		val versionString = "v${android.defaultConfig.versionName}=${android.defaultConfig.versionCode}"
+		logger.info("Writing [$versionString] to $path")
+		path.writeText("$versionString\n")
 	}
 }
 
 dependencies {
 	// Jellyfin
-	implementation("org.jellyfin.apiclient:android:0.7.4")
+	implementation(projects.playback)
+	implementation(libs.jellyfin.apiclient)
+	implementation(libs.jellyfin.sdk) {
+		// Change version if desired
+		val sdkVersion = findProperty("sdk.version")?.toString()
+		when (sdkVersion) {
+			"local" -> version { strictly("latest-SNAPSHOT") }
+			"snapshot" -> version { strictly("master-SNAPSHOT") }
+			"unstable-snapshot" -> version { strictly("openapi-unstable-SNAPSHOT") }
+		}
+	}
 
 	// Kotlin
-	implementation(kotlin("stdlib-jdk8"))
-
-	val kotlinCoroutinesVersion = "1.3.3"
-	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion")
-	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$kotlinCoroutinesVersion")
+	implementation(libs.kotlinx.coroutines)
+	implementation(libs.kotlinx.serialization.json)
 
 	// Android(x)
-	implementation("androidx.core:core-ktx:1.3.1")
-	implementation("androidx.fragment:fragment-ktx:1.2.5")
-	val androidxLeanbackVersion = "1.1.0-alpha03"
-	implementation("androidx.leanback:leanback:$androidxLeanbackVersion")
-	implementation("androidx.leanback:leanback-preference:$androidxLeanbackVersion")
-	val androidxPreferenceVersion = "1.1.1"
-	implementation("androidx.preference:preference:$androidxPreferenceVersion")
-	implementation("androidx.preference:preference-ktx:$androidxPreferenceVersion")
-	implementation("androidx.appcompat:appcompat:1.2.0")
-	implementation("androidx.tvprovider:tvprovider:1.0.0")
-	implementation("androidx.constraintlayout:constraintlayout:1.1.3")
-	implementation("androidx.recyclerview:recyclerview:1.1.0")
-	implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.2.0")
-	implementation("com.google.android:flexbox:2.0.1")
+	implementation(libs.androidx.core)
+	implementation(libs.androidx.activity)
+	implementation(libs.androidx.fragment)
+	implementation(libs.androidx.leanback.core)
+	implementation(libs.androidx.leanback.preference)
+	implementation(libs.androidx.preference)
+	implementation(libs.androidx.appcompat)
+	implementation(libs.androidx.tvprovider)
+	implementation(libs.androidx.constraintlayout)
+	implementation(libs.androidx.recyclerview)
+	implementation(libs.androidx.work.runtime)
+	implementation(libs.bundles.androidx.lifecycle)
+	implementation(libs.androidx.window)
+	implementation(libs.androidx.cardview)
+	implementation(libs.androidx.startup)
 
 	// Dependency Injection
-	val koinVersion = "2.1.6"
-	implementation("org.koin:koin-android-viewmodel:$koinVersion")
+	implementation(libs.bundles.koin)
+
+	// GSON
+	implementation(libs.gson)
 
 	// Media players
-	implementation("com.amazon.android:exoplayer:2.11.3")
-	implementation("org.videolan.android:libvlc-all:3.3.2")
+	implementation(libs.exoplayer)
+	implementation(libs.jellyfin.exoplayer.ffmpegextension)
+	implementation(libs.libvlc)
 
 	// Image utility
-	implementation("com.github.bumptech.glide:glide:4.11.0")
-	implementation("com.flaviofaria:kenburnsview:1.0.6")
+	implementation(libs.glide.core)
+	kapt(libs.glide.compiler)
+	implementation(libs.kenburnsview)
 
 	// Crash Reporting
-	val acraVersion = "5.4.0"
-	implementation("ch.acra:acra-http:$acraVersion")
-	implementation("ch.acra:acra-dialog:$acraVersion")
-	implementation("ch.acra:acra-limiter:$acraVersion")
+	implementation(libs.bundles.acra)
+
+	// Licenses
+	implementation(libs.aboutlibraries)
 
 	// Logging
-	implementation("com.jakewharton.timber:timber:4.7.1")
+	implementation(libs.timber)
+	implementation(libs.slf4j.timber)
+
+	// Debugging
+	if (getProperty("leakcanary.enable")?.toBoolean() == true)
+		debugImplementation(libs.leakcanary)
+
+	// Compatibility (desugaring)
+	coreLibraryDesugaring(libs.android.desugar)
 
 	// Testing
-	testImplementation("junit:junit:4.12")
-	testImplementation("org.mockito:mockito-core:3.2.4")
+	testImplementation(libs.kotest.runner.junit5)
+	testImplementation(libs.kotest.assertions)
+	testImplementation(libs.mockk)
 }

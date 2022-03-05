@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.annotation.StringRes
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceCategory
-import java.util.*
+import java.util.UUID
 
 class OptionsItemList(
 	private val context: Context
@@ -23,6 +23,7 @@ class OptionsItemList(
 			it.isEnabled = dependencyCheckFun() && enabled
 			it.isVisible = visible
 			it.title = title
+			it.dialogTitle = title
 			it.summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
 			it.entryValues = entries.keys.toTypedArray()
 			it.entries = entries.values.toTypedArray()

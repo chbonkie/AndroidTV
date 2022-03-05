@@ -24,13 +24,12 @@ import org.jellyfin.apiclient.model.livetv.TimerInfoDto;
 import org.jellyfin.apiclient.model.livetv.TimerQuery;
 import org.jellyfin.apiclient.model.querying.ItemFields;
 import org.jellyfin.apiclient.model.results.TimerInfoDtoResult;
+import org.koin.java.KoinJavaComponent;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import timber.log.Timber;
-
-import static org.koin.java.KoinJavaComponent.get;
 
 public class BrowseRecordingsFragment extends EnhancedBrowseFragment {
     @Override
@@ -39,9 +38,9 @@ public class BrowseRecordingsFragment extends EnhancedBrowseFragment {
     }
 
     @Override
-    protected void setupQueries(final IRowLoader rowLoader) {
+    protected void setupQueries(final RowLoader rowLoader) {
         showViews = true;
-        mTitle.setText(TvApp.getApplication().getResources().getString(R.string.lbl_loading_elipses));
+        mTitle.setText(getString(R.string.lbl_loading_elipses));
         //Latest Recordings
         RecordingQuery recordings = new RecordingQuery();
         recordings.setFields(new ItemFields[]{
@@ -117,7 +116,7 @@ public class BrowseRecordingsFragment extends EnhancedBrowseFragment {
     private void addNext24Timers() {
         final TimerQuery scheduled = new TimerQuery();
         final long ticks24 = 1000 * 60 * 60 * 24;
-        get(ApiClient.class).GetLiveTvTimersAsync(scheduled, new Response<TimerInfoDtoResult>() {
+        KoinJavaComponent.<ApiClient>get(ApiClient.class).GetLiveTvTimersAsync(scheduled, new Response<TimerInfoDtoResult>() {
             @Override
             public void onResponse(TimerInfoDtoResult response) {
                 List<BaseItemDto> nearTimers = new ArrayList<>();
@@ -158,7 +157,7 @@ public class BrowseRecordingsFragment extends EnhancedBrowseFragment {
 
             @Override
             public void onError(Exception exception) {
-                    Utils.showToast(mApplication, exception.getLocalizedMessage());
+                    Utils.showToast(getContext(), exception.getLocalizedMessage());
                     }
 
         });
@@ -166,12 +165,12 @@ public class BrowseRecordingsFragment extends EnhancedBrowseFragment {
 
     @Override
     protected void addAdditionalRows(ArrayObjectAdapter rowAdapter) {
-        HeaderItem gridHeader = new HeaderItem(rowAdapter.size(), mApplication.getString(R.string.lbl_views));
+        HeaderItem gridHeader = new HeaderItem(rowAdapter.size(), getString(R.string.lbl_views));
 
         GridButtonPresenter mGridPresenter = new GridButtonPresenter();
         ArrayObjectAdapter gridRowAdapter = new ArrayObjectAdapter(mGridPresenter);
-        gridRowAdapter.add(new GridButton(SCHEDULE, TvApp.getApplication().getString(R.string.lbl_schedule), R.drawable.tile_port_time));
-        gridRowAdapter.add(new GridButton(SERIES, mActivity.getString(R.string.lbl_series_recordings), R.drawable.tile_port_series_timer));
+        gridRowAdapter.add(new GridButton(SCHEDULE, getString(R.string.lbl_schedule), R.drawable.tile_port_time, null));
+        gridRowAdapter.add(new GridButton(SERIES, mActivity.getString(R.string.lbl_series_recordings), R.drawable.tile_port_series_timer, null));
         rowAdapter.add(new ListRow(gridHeader, gridRowAdapter));
     }
 }

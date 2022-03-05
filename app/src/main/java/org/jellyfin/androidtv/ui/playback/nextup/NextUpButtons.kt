@@ -3,23 +3,26 @@ package org.jellyfin.androidtv.ui.playback.nextup
 import android.content.Context
 import android.os.CountDownTimer
 import android.util.AttributeSet
-import android.view.View
+import android.view.LayoutInflater
 import android.widget.FrameLayout
-import kotlinx.android.synthetic.main.fragment_next_up_buttons.view.*
-import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.preference.UserPreferences
-import org.koin.core.KoinComponent
-import org.koin.core.get
+import org.jellyfin.androidtv.databinding.FragmentNextUpButtonsBinding
 
-class NextUpButtons(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0, defStyle: Int = 0) : FrameLayout(context, attrs, defStyleAttr, defStyle), KoinComponent {
+class NextUpButtons(
+	context: Context,
+	attrs: AttributeSet? = null,
+	defStyleAttr: Int = 0,
+	defStyle: Int = 0
+) : FrameLayout(context, attrs, defStyleAttr, defStyle) {
 	constructor(context: Context, attrs: AttributeSet) : this(context, attrs, 0, 0)
 
 	private var countdownTimer: CountDownTimer? = null
-	private val view = View.inflate(context, R.layout.fragment_next_up_buttons, null)
+	private val view = FragmentNextUpButtonsBinding.inflate(LayoutInflater.from(context), this, true)
+
+	var countdownTimerEnabled: Boolean = false
+	var duration: Int = 0
 
 	init {
-		addView(view)
-		view.fragment_next_up_buttons_play_next.apply {
+		view.fragmentNextUpButtonsPlayNext.apply {
 			// Stop timer when unfocused
 			setOnFocusChangeListener { _, focused -> if (!focused) stopTimer() }
 
@@ -29,21 +32,23 @@ class NextUpButtons(context: Context, attrs: AttributeSet? = null, defStyleAttr:
 	}
 
 	fun startTimer() {
-		val duration = get<UserPreferences>()[UserPreferences.nextUpTimeout].toLong()
-
 		// Cancel current timer if one is already set
 		countdownTimer?.cancel()
 
+		if (!countdownTimerEnabled) return
+
 		// Create timer
-		countdownTimer = object : CountDownTimer(duration, 1) {
+		countdownTimer = object : CountDownTimer(duration.toLong(), 1) {
 			override fun onTick(millisUntilFinished: Long) {
-				fragment_next_up_buttons_play_next_progress.max = duration.toInt()
-				fragment_next_up_buttons_play_next_progress.progress = (duration - millisUntilFinished).toInt()
+				view.fragmentNextUpButtonsPlayNextProgress.apply {
+					max = duration
+					progress = (duration - millisUntilFinished).toInt()
+				}
 			}
 
 			override fun onFinish() {
 				// Perform a click so the event handler will activate
-				view.fragment_next_up_buttons_play_next.performClick()
+				view.fragmentNextUpButtonsPlayNext.performClick()
 			}
 		}.start()
 	}
@@ -52,21 +57,17 @@ class NextUpButtons(context: Context, attrs: AttributeSet? = null, defStyleAttr:
 		countdownTimer?.cancel()
 
 		// Hide progress bar
-		fragment_next_up_buttons_play_next_progress.max = 0
-		fragment_next_up_buttons_play_next_progress.progress = 0
+		view.fragmentNextUpButtonsPlayNextProgress.apply {
+			max = 0
+			progress = 0
+		}
 	}
 
-	fun setPlayNextListener(listener: (() -> Unit)?) {
-		val button = view.fragment_next_up_buttons_play_next
-
-		if (listener == null) button.setOnClickListener(null)
-		else button.setOnClickListener { listener() }
+	fun setPlayNextListener(listener: () -> Unit) {
+		view.fragmentNextUpButtonsPlayNext.setOnClickListener { listener() }
 	}
 
 	fun setCancelListener(listener: () -> Unit) {
-		val button = view.fragment_next_up_buttons_cancel
-
-		if (listener == null) button.setOnClickListener(null)
-		else button.setOnClickListener { listener() }
+		view.fragmentNextUpButtonsCancel.setOnClickListener { listener() }
 	}
 }

@@ -1,28 +1,15 @@
 package org.jellyfin.androidtv.ui;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import org.jellyfin.androidtv.R;
-import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
-import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
-import org.jellyfin.androidtv.data.model.FilterOptions;
-import org.jellyfin.androidtv.ui.presentation.HorizontalGridPresenter;
-import org.jellyfin.androidtv.util.InfoLayoutHelper;
-import org.jellyfin.androidtv.util.Utils;
-import org.jellyfin.apiclient.model.entities.SortOrder;
-
-import java.util.HashMap;
-import java.util.Map;
-
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.leanback.widget.BaseGridView;
 import androidx.leanback.widget.ObjectAdapter;
@@ -33,14 +20,25 @@ import androidx.leanback.widget.Row;
 import androidx.leanback.widget.RowPresenter;
 import androidx.leanback.widget.VerticalGridPresenter;
 
-public class GridFragment extends Fragment {
-    private static final String TAG = "HorizontalGridFragment";
-    private static boolean DEBUG = false;
+import org.jellyfin.androidtv.R;
+import org.jellyfin.androidtv.data.model.FilterOptions;
+import org.jellyfin.androidtv.databinding.HorizontalGridBrowseBinding;
+import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
+import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
+import org.jellyfin.androidtv.ui.presentation.HorizontalGridPresenter;
+import org.jellyfin.androidtv.util.InfoLayoutHelper;
+import org.jellyfin.androidtv.util.Utils;
+import org.jellyfin.apiclient.model.entities.SortOrder;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import timber.log.Timber;
+
+public class GridFragment extends Fragment {
     protected TextView mTitleView;
     private TextView mStatusText;
     private TextView mCounter;
-    protected FrameLayout mSpinner;
     protected ViewGroup mGridDock;
     protected LinearLayout mInfoRow;
     protected LinearLayout mToolBar;
@@ -51,13 +49,61 @@ public class GridFragment extends Fragment {
     private OnItemViewSelectedListener mOnItemViewSelectedListener;
     private OnItemViewClickedListener mOnItemViewClickedListener;
     private int mSelectedPosition = -1;
+    private int mCardHeight;
 
-    protected int SMALL_CARD = Utils.convertDpToPixel(TvApp.getApplication(), 116);
-    protected int MED_CARD = Utils.convertDpToPixel(TvApp.getApplication(), 175);
-    protected int LARGE_CARD = Utils.convertDpToPixel(TvApp.getApplication(), 210);
-    protected int SMALL_BANNER = Utils.convertDpToPixel(TvApp.getApplication(), 58);
-    protected int MED_BANNER = Utils.convertDpToPixel(TvApp.getApplication(), 88);
-    protected int LARGE_BANNER = Utils.convertDpToPixel(TvApp.getApplication(), 105);
+    protected int SMALL_CARD;
+    protected int MED_CARD;
+    protected int LARGE_CARD;
+    protected int SMALL_BANNER;
+    protected int MED_BANNER;
+    protected int LARGE_BANNER;
+    protected int SMALL_VERTICAL_POSTER;
+    protected int MED_VERTICAL_POSTER;
+    protected int LARGE_VERTICAL_POSTER;
+    protected int SMALL_VERTICAL_SQUARE;
+    protected int MED_VERTICAL_SQUARE;
+    protected int LARGE_VERTICAL_SQUARE;
+    protected int SMALL_VERTICAL_THUMB;
+    protected int MED_VERTICAL_THUMB;
+    protected int LARGE_VERTICAL_THUMB;
+    protected int SMALL_VERTICAL_BANNER;
+    protected int MED_VERTICAL_BANNER;
+    protected int LARGE_VERTICAL_BANNER;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        SMALL_CARD = Utils.convertDpToPixel(getContext(), 116);
+        MED_CARD = Utils.convertDpToPixel(getContext(), 175);
+        LARGE_CARD = Utils.convertDpToPixel(getContext(), 210);
+        SMALL_BANNER = Utils.convertDpToPixel(getContext(), 58);
+        MED_BANNER = Utils.convertDpToPixel(getContext(), 88);
+        LARGE_BANNER = Utils.convertDpToPixel(getContext(), 105);
+        SMALL_VERTICAL_POSTER = Utils.convertDpToPixel(getContext(), 116);
+        MED_VERTICAL_POSTER = Utils.convertDpToPixel(getContext(), 171);
+        LARGE_VERTICAL_POSTER = Utils.convertDpToPixel(getContext(), 202);
+        SMALL_VERTICAL_SQUARE = Utils.convertDpToPixel(getContext(), 114);
+        MED_VERTICAL_SQUARE = Utils.convertDpToPixel(getContext(), 163);
+        LARGE_VERTICAL_SQUARE = Utils.convertDpToPixel(getContext(), 206);
+        SMALL_VERTICAL_THUMB = Utils.convertDpToPixel(getContext(), 116);
+        MED_VERTICAL_THUMB = Utils.convertDpToPixel(getContext(), 155);
+        LARGE_VERTICAL_THUMB = Utils.convertDpToPixel(getContext(), 210);
+        SMALL_VERTICAL_BANNER = Utils.convertDpToPixel(getContext(), 51);
+        MED_VERTICAL_BANNER = Utils.convertDpToPixel(getContext(), 77);
+        LARGE_VERTICAL_BANNER = Utils.convertDpToPixel(getContext(), 118);
+
+        sortOptions = new HashMap<>();
+        {
+            sortOptions.put(0, new SortOption(getString(R.string.lbl_name), "SortName", SortOrder.Ascending));
+            sortOptions.put(1, new SortOption(getString(R.string.lbl_date_added), "DateCreated,SortName", SortOrder.Descending));
+            sortOptions.put(2, new SortOption(getString(R.string.lbl_premier_date), "PremiereDate,SortName", SortOrder.Descending));
+            sortOptions.put(3, new SortOption(getString(R.string.lbl_rating), "OfficialRating,SortName", SortOrder.Ascending));
+            sortOptions.put(4, new SortOption(getString(R.string.lbl_community_rating), "CommunityRating,SortName", SortOrder.Descending));
+            sortOptions.put(5,new SortOption(getString(R.string.lbl_critic_rating), "CriticRating,SortName", SortOrder.Descending));
+            sortOptions.put(6, new SortOption(getString(R.string.lbl_last_played), "DatePlayed,SortName", SortOrder.Descending));
+        };
+    }
 
     /**
      * Sets the grid presenter.
@@ -110,13 +156,13 @@ public class GridFragment extends Fragment {
     }
 
     public int getGridHeight() {
-        return Utils.convertDpToPixel(TvApp.getApplication(), 400);
+        return Utils.convertDpToPixel(requireContext(), 400);
     }
 
     public void setItem(BaseRowItem item) {
         if (item != null) {
-            mTitleView.setText(item.getFullName());
-            InfoLayoutHelper.addInfoRow(getActivity(), item, mInfoRow, true, true);
+            mTitleView.setText(item.getFullName(requireContext()));
+            InfoLayoutHelper.addInfoRow(requireContext(), item, mInfoRow, true, true);
         } else {
             mTitleView.setText("");
             mInfoRow.removeAllViews();
@@ -135,15 +181,7 @@ public class GridFragment extends Fragment {
         }
     }
 
-    protected Map<Integer, SortOption> sortOptions = new HashMap<>();
-    {
-        sortOptions.put(0, new SortOption(TvApp.getApplication().getString(R.string.lbl_name), "SortName", SortOrder.Ascending));
-        sortOptions.put(1, new SortOption(TvApp.getApplication().getString(R.string.lbl_date_added), "DateCreated,SortName", SortOrder.Descending));
-        sortOptions.put(2, new SortOption(TvApp.getApplication().getString(R.string.lbl_premier_date), "PremiereDate,SortName", SortOrder.Descending));
-        sortOptions.put(3,new SortOption(TvApp.getApplication().getString(R.string.lbl_rating), "OfficialRating,SortName", SortOrder.Ascending));
-        sortOptions.put(4,new SortOption(TvApp.getApplication().getString(R.string.lbl_critic_rating), "CriticRating,SortName", SortOrder.Descending));
-        sortOptions.put(5,new SortOption(TvApp.getApplication().getString(R.string.lbl_last_played), "DatePlayed,SortName", SortOrder.Descending));
-    }
+    protected Map<Integer, SortOption> sortOptions;
 
     protected String getSortFriendlyName(String value) {
         return getSortOption(value).name;
@@ -163,20 +201,20 @@ public class GridFragment extends Fragment {
     }
 
     public void setStatusText(String folderName) {
-        String text = TvApp.getApplication().getResources().getString(R.string.lbl_showing) + " ";
+        String text = getString(R.string.lbl_showing) + " ";
         FilterOptions filters = mAdapter.getFilters();
         if (filters == null || (!filters.isFavoriteOnly() && !filters.isUnwatchedOnly())) {
-            text += TvApp.getApplication().getResources().getString(R.string.lbl_all_items);
+            text += getString(R.string.lbl_all_items);
         } else {
-            text += (filters.isUnwatchedOnly() ? TvApp.getApplication().getResources().getString(R.string.lbl_unwatched) : "") + " " +
-                    (filters.isFavoriteOnly() ? TvApp.getApplication().getResources().getString(R.string.lbl_favorites) : "");
+            text += (filters.isUnwatchedOnly() ? getString(R.string.lbl_unwatched) : "") + " " +
+                    (filters.isFavoriteOnly() ? getString(R.string.lbl_favorites) : "");
         }
 
         if (mAdapter.getStartLetter() != null) {
-            text += " " + TvApp.getApplication().getResources().getString(R.string.lbl_starting_with) + " " + mAdapter.getStartLetter();
+            text += " " + getString(R.string.lbl_starting_with) + " " + mAdapter.getStartLetter();
         }
 
-        text += " " + TvApp.getApplication().getString(R.string.lbl_from) + " '" + folderName + "' " + TvApp.getApplication().getString(R.string.lbl_sorted_by) + " " + getSortFriendlyName(mAdapter.getSortBy());
+        text += " " + getString(R.string.lbl_from) + " '" + folderName + "' " + getString(R.string.lbl_sorted_by) + " " + getSortFriendlyName(mAdapter.getSortBy());
 
         mStatusText.setText(text);
     }
@@ -189,11 +227,33 @@ public class GridFragment extends Fragment {
                 public void onItemSelected(Presenter.ViewHolder itemViewHolder, Object item,
                                            RowPresenter.ViewHolder rowViewHolder, Row row) {
                     int position = mGridView.getSelectedPosition();
-                    if (DEBUG) Log.v(TAG, "row selected position " + position);
+                    Timber.d("row selected position %s", position);
                     onRowSelected(position);
                     if (mOnItemViewSelectedListener != null && position >= 0) {
                         mOnItemViewSelectedListener.onItemSelected(itemViewHolder, item,
                                 rowViewHolder, row);
+                    }
+                    if (mGridPresenter instanceof VerticalGridPresenter) {
+                        if (mCardHeight == SMALL_VERTICAL_BANNER && position < ((VerticalGridPresenter)mGridPresenter).getNumberOfColumns()) {
+                            mGridView.setWindowAlignmentOffsetPercent((float) 11.4);
+                        } else if (mCardHeight == SMALL_VERTICAL_BANNER && position < ((VerticalGridPresenter)mGridPresenter).getNumberOfColumns() * 2) {
+                            mGridView.setWindowAlignmentOffsetPercent((float) 25.95);
+                        } else if (mCardHeight == SMALL_VERTICAL_BANNER && position < ((VerticalGridPresenter)mGridPresenter).getNumberOfColumns() * 3) {
+                            mGridView.setWindowAlignmentOffsetPercent((float) 40.5);
+                        } else if (mCardHeight == MED_VERTICAL_BANNER && position < ((VerticalGridPresenter)mGridPresenter).getNumberOfColumns()) {
+                            mGridView.setWindowAlignmentOffsetPercent(15);
+                        } else if (mCardHeight == MED_VERTICAL_BANNER && position < ((VerticalGridPresenter)mGridPresenter).getNumberOfColumns() * 2) {
+                            mGridView.setWindowAlignmentOffsetPercent(36);
+                        } else if (mCardHeight == SMALL_VERTICAL_SQUARE && position >= ((VerticalGridPresenter)mGridPresenter).getNumberOfColumns() && position < ((VerticalGridPresenter)mGridPresenter).getNumberOfColumns() * 2) {
+                            mGridView.setWindowAlignmentOffsetPercent((float) 49.3);
+                            mGridView.setWindowAlignmentOffset(0);
+                        } else if (position < ((VerticalGridPresenter)mGridPresenter).getNumberOfColumns()) {
+                            mGridView.setWindowAlignmentOffsetPercent((float) 5.1);
+                            mGridView.setWindowAlignmentOffset((int) Math.round(mCardHeight * 0.5));
+                        } else {
+                            mGridView.setWindowAlignmentOffsetPercent(50);
+                            mGridView.setWindowAlignmentOffset(0);
+                        }
                     }
                 }
             };
@@ -240,50 +300,26 @@ public class GridFragment extends Fragment {
         return mOnItemViewClickedListener;
     }
 
-    public void showSpinner() {
-        if (getActivity() == null || getActivity().isFinishing() || mSpinner == null) return;
-
-        getActivity().runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                mSpinner.setVisibility(View.VISIBLE);
-            }
-        });
-    }
-
-    public void hideSpinner() {
-        if (getActivity() == null || getActivity().isFinishing() || mSpinner == null) return;
-
-        getActivity().runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                mSpinner.setVisibility(View.GONE);
-            }
-        });
-    }
-
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        ViewGroup root = (ViewGroup) inflater.inflate(R.layout.horizontal_grid_browse,
-                container, false);
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        HorizontalGridBrowseBinding binding = HorizontalGridBrowseBinding.inflate(inflater, container, false);
 
-        mTitleView = (TextView) root.findViewById(R.id.title);
-        mStatusText = (TextView) root.findViewById(R.id.statusText);
-        mInfoRow = (LinearLayout) root.findViewById(R.id.infoRow);
-        mToolBar = (LinearLayout) root.findViewById(R.id.toolBar);
-        mCounter = (TextView) root.findViewById(R.id.counter);
-        mSpinner = (FrameLayout) root.findViewById(R.id.spinner);
-        mGridDock = (ViewGroup) root.findViewById(R.id.rowsFragment);
+        mTitleView = binding.title;
+        mStatusText = binding.statusText;
+        mInfoRow = binding.infoRow;
+        mToolBar = binding.toolBar;
+        mCounter = binding.counter;
+        mGridDock = binding.rowsFragment;
 
         // Hide the description because we don't have room for it
-        ((NowPlayingBug)root.findViewById(R.id.npBug)).showDescription(false);
+        binding.npBug.showDescription(false);
 
-        return root;
+        return binding.getRoot();
     }
 
     @Override
-    public void onViewCreated(View view, Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         createGrid();
     }
 
@@ -318,16 +354,6 @@ public class GridFragment extends Fragment {
         mGridView = null;
     }
 
-    /**
-     * Sets the selected item position.
-     */
-    public void setSelectedPosition(int position) {
-        mSelectedPosition = position;
-        if(mGridView != null && mGridView.getAdapter() != null) {
-            mGridView.setSelectedPositionSmooth(position);
-        }
-    }
-
     private void updateAdapter() {
         if (mGridView != null) {
             mGridPresenter.onBindViewHolder(mGridViewHolder, mAdapter);
@@ -335,5 +361,9 @@ public class GridFragment extends Fragment {
                 mGridView.setSelectedPosition(mSelectedPosition);
             }
         }
+    }
+
+    protected void setCardHeight(int height) {
+        mCardHeight = height;
     }
 }

@@ -1,5 +1,7 @@
 package org.jellyfin.androidtv.ui;
 
+import static org.koin.java.KoinJavaComponent.inject;
+
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -17,7 +19,8 @@ import androidx.core.content.ContextCompat;
 
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
-import org.jellyfin.androidtv.ui.livetv.ILiveTvGuide;
+import org.jellyfin.androidtv.data.model.DataRefreshService;
+import org.jellyfin.androidtv.ui.livetv.LiveTvGuide;
 import org.jellyfin.androidtv.ui.livetv.TvManager;
 import org.jellyfin.androidtv.ui.shared.BaseActivity;
 import org.jellyfin.androidtv.util.InfoLayoutHelper;
@@ -30,22 +33,19 @@ import org.jellyfin.apiclient.model.dto.BaseItemDto;
 import org.jellyfin.apiclient.model.dto.UserItemDataDto;
 import org.jellyfin.apiclient.model.livetv.ChannelInfoDto;
 import org.jellyfin.apiclient.model.livetv.SeriesTimerInfoDto;
+import org.koin.java.KoinJavaComponent;
 
 import java.util.Date;
 
 import kotlin.Lazy;
 import timber.log.Timber;
 
-import static org.koin.java.KoinJavaComponent.inject;
-
 public class LiveProgramDetailPopup {
-    private final int NORMAL_HEIGHT = Utils.convertDpToPixel(TvApp.getApplication(), 400);
-
     private PopupWindow mPopup;
     private BaseItemDto mProgram;
     private ProgramGridCell mSelectedProgramView;
     private BaseActivity mActivity;
-    private ILiveTvGuide mTvGuide;
+    private LiveTvGuide mTvGuide;
     private TextView mDTitle;
     private TextView mDSummary;
     private TextView mDRecordInfo;
@@ -64,17 +64,18 @@ public class LiveProgramDetailPopup {
 
     private Lazy<ApiClient> apiClient = inject(ApiClient.class);
 
-    public LiveProgramDetailPopup(BaseActivity activity, ILiveTvGuide tvGuide, int width, EmptyResponse tuneAction) {
+    public LiveProgramDetailPopup(BaseActivity activity, LiveTvGuide tvGuide, int width, EmptyResponse tuneAction) {
         mActivity = activity;
         mTvGuide = tvGuide;
         mTuneAction = tuneAction;
         LayoutInflater inflater = (LayoutInflater) mActivity.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         View layout = inflater.inflate(R.layout.program_detail_popup, null);
-        mPopup = new PopupWindow(layout, width, NORMAL_HEIGHT);
+        int popupHeight = Utils.convertDpToPixel(activity, 400);
+        mPopup = new PopupWindow(layout, width, popupHeight);
         mPopup.setFocusable(true);
         mPopup.setOutsideTouchable(true);
         mPopup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT)); // necessary for popup to dismiss
-        mPopup.setAnimationStyle(R.style.PopupSlideInTop);
+        mPopup.setAnimationStyle(R.style.WindowAnimation_SlideTop);
         mDTitle = layout.findViewById(R.id.title);
         mDSummary = layout.findViewById(R.id.summary);
         mDRecordInfo = layout.findViewById(R.id.recordLine);
@@ -360,7 +361,8 @@ public class LiveProgramDetailPopup {
                         channel.setUserData(response);
                         fave.setImageDrawable(ContextCompat.getDrawable(mActivity, response.getIsFavorite() ? R.drawable.ic_heart_red : R.drawable.ic_heart));
                         mTvGuide.refreshFavorite(channel.getId());
-                        TvApp.getApplication().dataRefreshService.setLastFavoriteUpdate(System.currentTimeMillis());
+                        DataRefreshService dataRefreshService = KoinJavaComponent.<DataRefreshService>get(DataRefreshService.class);
+                        dataRefreshService.setLastFavoriteUpdate(System.currentTimeMillis());
                     }
                 });
             }
@@ -407,7 +409,7 @@ public class LiveProgramDetailPopup {
         apiClient.getValue().GetLiveTvSeriesTimerAsync(mProgram.getSeriesTimerId(), new Response<SeriesTimerInfoDto>() {
             @Override
             public void onResponse(SeriesTimerInfoDto response) {
-                mRecordPopup.setContent(mProgram, response, mSelectedProgramView, recordSeries);
+                mRecordPopup.setContent(mActivity, mProgram, response, mSelectedProgramView, recordSeries);
                 mRecordPopup.show();
             }
         });

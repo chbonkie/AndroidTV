@@ -1,7 +1,6 @@
 package org.jellyfin.androidtv.util;
 
-import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.app.Activity;
 import android.content.Intent;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -11,14 +10,16 @@ import android.widget.PopupMenu;
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.constant.CustomMessage;
+import org.jellyfin.androidtv.data.model.DataRefreshService;
 import org.jellyfin.androidtv.data.querying.StdItemQuery;
-import org.jellyfin.androidtv.ui.shared.BaseActivity;
 import org.jellyfin.androidtv.ui.itemdetail.ItemListActivity;
 import org.jellyfin.androidtv.ui.itemdetail.PhotoPlayerActivity;
 import org.jellyfin.androidtv.ui.itemhandling.AudioQueueItem;
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
 import org.jellyfin.androidtv.ui.playback.AudioNowPlayingActivity;
 import org.jellyfin.androidtv.ui.playback.MediaManager;
+import org.jellyfin.androidtv.ui.playback.PlaybackLauncher;
+import org.jellyfin.androidtv.ui.shared.BaseActivity;
 import org.jellyfin.androidtv.util.apiclient.BaseItemUtils;
 import org.jellyfin.androidtv.util.apiclient.PlaybackHelper;
 import org.jellyfin.apiclient.interaction.ApiClient;
@@ -29,21 +30,16 @@ import org.jellyfin.apiclient.model.dto.UserItemDataDto;
 import org.jellyfin.apiclient.model.entities.SortOrder;
 import org.jellyfin.apiclient.model.querying.ItemFilter;
 import org.jellyfin.apiclient.model.querying.ItemsResult;
+import org.koin.java.KoinJavaComponent;
 
 import java.util.List;
 
 import timber.log.Timber;
 
-import static org.koin.java.KoinJavaComponent.get;
-
 public class KeyProcessor {
 
     public static final int MENU_MARK_FAVORITE = 0;
     public static final int MENU_UNMARK_FAVORITE = 1;
-    public static final int MENU_LIKE = 2;
-    public static final int MENU_DISLIKE = 3;
-    public static final int MENU_UNLIKE = 4;
-    public static final int MENU_UNDISLIKE = 5;
     public static final int MENU_MARK_PLAYED = 6;
     public static final int MENU_UNMARK_PLAYED = 7;
     public static final int MENU_PLAY = 8;
@@ -54,22 +50,20 @@ public class KeyProcessor {
     public static final int MENU_REMOVE_FROM_QUEUE = 13;
     public static final int MENU_GOTO_NOW_PLAYING = 14;
     public static final int MENU_INSTANT_MIX = 15;
-    public static final int MENU_FORGET = 16;
 
     private static String mCurrentItemId;
     private static BaseItemDto mCurrentItem;
-    private static BaseActivity mCurrentActivity;
+    private static Activity mCurrentActivity;
     private static int mCurrentRowItemNdx;
-    private static boolean currentItemIsFolder = false;
     private static boolean isMusic;
 
-    public static boolean HandleKey(int key, BaseRowItem rowItem, BaseActivity activity) {
+    public static boolean HandleKey(int key, BaseRowItem rowItem, Activity activity) {
         if (rowItem == null) return false;
         switch (key) {
             case KeyEvent.KEYCODE_MEDIA_PLAY:
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
-                if (MediaManager.isPlayingAudio() && (!rowItem.isBaseItem() || rowItem.getBaseItemType() != BaseItemType.Photo)) {
-                    MediaManager.pauseAudio();
+                if (KoinJavaComponent.<MediaManager>get(MediaManager.class).isPlayingAudio() && (!rowItem.isBaseItem() || rowItem.getBaseItemType() != BaseItemType.Photo)) {
+                    KoinJavaComponent.<MediaManager>get(MediaManager.class).pauseAudio();
                     return true;
                 }
 
@@ -92,8 +86,6 @@ public class KeyProcessor {
                             case Program:
                             case ChannelVideoItem:
                             case Trailer:
-                                // give some audible feedback
-                                Utils.beep();
                                 // retrieve full item and play
                                 PlaybackHelper.retrieveAndPlay(item.getId(), false, activity);
                                 return true;
@@ -111,7 +103,6 @@ public class KeyProcessor {
                                 return true;
                             case Photo:
                                 // open photo player
-                                Utils.beep();
                                 Intent photoIntent = new Intent(activity, PhotoPlayerActivity.class);
                                 photoIntent.putExtra("Play",true);
                                 activity.startActivity(photoIntent);
@@ -133,8 +124,6 @@ public class KeyProcessor {
                             case "TvChannel":
                             case "Video":
                             case "Program":
-                                // give some audible feedback
-                                Utils.beep();
                                 // retrieve full item and play
                                 PlaybackHelper.retrieveAndPlay(rowItem.getItemId(), false, activity);
                                 return true;
@@ -147,37 +136,33 @@ public class KeyProcessor {
                         break;
                     case LiveTvChannel:
                     case LiveTvRecording:
-                        // give some audible feedback
-                        Utils.beep();
                         // retrieve full item and play
                         PlaybackHelper.retrieveAndPlay(rowItem.getItemId(), false, activity);
                         return true;
                     case LiveTvProgram:
-                        // give some audible feedback
-                        Utils.beep();
                         // retrieve channel this program belongs to and play
                         PlaybackHelper.retrieveAndPlay(rowItem.getProgramInfo().getChannelId(), false, activity);
                         return true;
                     case GridButton:
                         if (rowItem.getGridButton().getId() == TvApp.VIDEO_QUEUE_OPTION_ID) {
                             //Queue already there - just kick off playback
-                            Utils.beep();
-                            BaseItemType itemType = MediaManager.getCurrentVideoQueue().size() > 0 ? MediaManager.getCurrentVideoQueue().get(0).getBaseItemType() : null;
-                            Intent intent = new Intent(activity, TvApp.getApplication().getPlaybackActivityClass(itemType));
+                            BaseItemType itemType = KoinJavaComponent.<MediaManager>get(MediaManager.class).getCurrentVideoQueue().size() > 0 ? KoinJavaComponent.<MediaManager>get(MediaManager.class).getCurrentVideoQueue().get(0).getBaseItemType() : null;
+                            Class newActivity = KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class).getPlaybackActivityClass(itemType);
+                            Intent intent = new Intent(activity, newActivity);
                             activity.startActivity(intent);
                         }
                         break;
                 }
 
-                if (MediaManager.hasAudioQueueItems()) {
-                    MediaManager.resumeAudio();
+                if (KoinJavaComponent.<MediaManager>get(MediaManager.class).hasAudioQueueItems()) {
+                    KoinJavaComponent.<MediaManager>get(MediaManager.class).resumeAudio();
                     return true;
                 }
 
                 break;
             case KeyEvent.KEYCODE_MENU:
             case KeyEvent.KEYCODE_BUTTON_Y:
-                Timber.d("Menu for: %s", rowItem.getFullName());
+                Timber.d("Menu for: %s", rowItem.getFullName(activity));
 
                 //Create a contextual menu based on item
                 switch (rowItem.getItemType()) {
@@ -228,20 +213,20 @@ public class KeyProcessor {
         return false;
     }
 
-    private static void createItemMenu(BaseRowItem rowItem, UserItemDataDto userData, BaseActivity activity) {
+    public static PopupMenu createItemMenu(BaseRowItem rowItem, UserItemDataDto userData, Activity activity) {
         BaseItemDto item = rowItem.getBaseItem();
-        PopupMenu menu = Utils.createPopupMenu(activity, activity.getCurrentFocus(), Gravity.RIGHT);
+        PopupMenu menu = new PopupMenu(activity, activity.getCurrentFocus(), Gravity.END);
         int order = 0;
 
         if (rowItem instanceof AudioQueueItem) {
             if (!(activity instanceof AudioNowPlayingActivity)) {
                 menu.getMenu().add(0, MENU_GOTO_NOW_PLAYING, order++, R.string.lbl_goto_now_playing);
             }
-            if (rowItem.getBaseItem() != MediaManager.getCurrentAudioItem()) {
+            if (rowItem.getBaseItem() != KoinJavaComponent.<MediaManager>get(MediaManager.class).getCurrentAudioItem()) {
                 menu.getMenu().add(0, MENU_ADVANCE_QUEUE, order++, R.string.lbl_play_from_here);
             }
             // don't allow removal of last item - framework will crash trying to animate an empty row
-            if (MediaManager.getCurrentAudioQueue().size() > 1) {
+            if (KoinJavaComponent.<MediaManager>get(MediaManager.class).getCurrentAudioQueue().size() > 1) {
                 menu.getMenu().add(0, MENU_REMOVE_FROM_QUEUE, order++, R.string.lbl_remove_from_queue);
             }
         } else {
@@ -289,17 +274,6 @@ public class KeyProcessor {
             } else {
                 menu.getMenu().add(0, MENU_MARK_FAVORITE, order++, activity.getString(R.string.lbl_add_favorite));
             }
-
-            if (userData.getLikes() == null) {
-                menu.getMenu().add(0, MENU_LIKE, order++, activity.getString(R.string.lbl_like));
-                menu.getMenu().add(0, MENU_DISLIKE, order++, activity.getString(R.string.lbl_dislike));
-            } else if (userData.getLikes()) {
-                menu.getMenu().add(0, MENU_UNLIKE, order++, activity.getString(R.string.lbl_unlike));
-                menu.getMenu().add(0, MENU_DISLIKE, order++, activity.getString(R.string.lbl_dislike));
-            } else {
-                menu.getMenu().add(0, MENU_LIKE, order++, activity.getString(R.string.lbl_like));
-                menu.getMenu().add(0, MENU_UNDISLIKE, order++, activity.getString(R.string.lbl_remove_dislike));
-            }
         }
 
         //Not sure I like this but I either duplicate processing with in-line events or do this and
@@ -308,14 +282,14 @@ public class KeyProcessor {
         mCurrentRowItemNdx = rowItem.getIndex();
         mCurrentItemId = item.getId();
         mCurrentActivity = activity;
-        currentItemIsFolder = item.getIsFolderItem();
 
         menu.setOnMenuItemClickListener(menuItemClickListener);
         menu.show();
+        return menu;
     }
 
-    private static void createPlayMenu(BaseItemDto item, boolean isFolder, boolean isMusic, BaseActivity activity) {
-        PopupMenu menu = Utils.createPopupMenu(activity, activity.getCurrentFocus(), Gravity.RIGHT);
+    private static void createPlayMenu(BaseItemDto item, boolean isFolder, boolean isMusic, Activity activity) {
+        PopupMenu menu = new PopupMenu(activity, activity.getCurrentFocus(), Gravity.END);
         int order = 0;
         if (!isMusic && item.getBaseItemType() != BaseItemType.Playlist) {
             menu.getMenu().add(0, MENU_PLAY_FIRST_UNWATCHED, order++, R.string.lbl_play_first_unwatched);
@@ -331,7 +305,6 @@ public class KeyProcessor {
         mCurrentItem = item;
         mCurrentItemId = item.getId();
         mCurrentActivity = activity;
-        currentItemIsFolder = isFolder;
 
         menu.setOnMenuItemClickListener(menuItemClickListener);
         menu.show();
@@ -361,7 +334,7 @@ public class KeyProcessor {
                         PlaybackHelper.getItemsToPlay(mCurrentItem, false, false, new Response<List<BaseItemDto>>() {
                             @Override
                             public void onResponse(List<BaseItemDto> response) {
-                                MediaManager.addToAudioQueue(response);
+                                KoinJavaComponent.<MediaManager>get(MediaManager.class).addToAudioQueue(response);
                             }
 
                             @Override
@@ -371,10 +344,10 @@ public class KeyProcessor {
                         });
 
                     } else {
-                        get(ApiClient.class).GetItemAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
+                        KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
                             @Override
                             public void onResponse(BaseItemDto response) {
-                                MediaManager.addToVideoQueue(response);
+                                KoinJavaComponent.<MediaManager>get(MediaManager.class).addToVideoQueue(response);
                             }
 
                             @Override
@@ -395,7 +368,7 @@ public class KeyProcessor {
                     query.setLimit(1);
                     query.setExcludeItemTypes(new String[] {"Series","Season","Folder","MusicAlbum","Playlist","BoxSet"});
                     query.setFilters(new ItemFilter[] {ItemFilter.IsUnplayed});
-                    get(ApiClient.class).GetItemsAsync(query, new Response<ItemsResult>() {
+                    KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemsAsync(query, new Response<ItemsResult>() {
                         @Override
                         public void onResponse(ItemsResult response) {
                             if (response.getTotalRecordCount() == 0) {
@@ -419,71 +392,23 @@ public class KeyProcessor {
                     toggleFavorite(false);
                     return true;
                 case MENU_MARK_PLAYED:
-                    if (currentItemIsFolder) {
-                        // confirm
-                        new AlertDialog.Builder(mCurrentActivity)
-                                .setTitle(R.string.lbl_mark_played)
-                                .setMessage(mCurrentActivity.getString(R.string.lbl_confirm_mark_watched))
-                                .setNegativeButton(mCurrentActivity.getString(R.string.lbl_no), new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface dialog, int which) {
-
-                                    }
-                                }).setPositiveButton(mCurrentActivity.getString(R.string.lbl_yes), new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                    markPlayed();
-                            }
-                        }).show();
-
-                    } else {
-                        markPlayed();
-                    }
+                    markPlayed();
                     return true;
                 case MENU_UNMARK_PLAYED:
-                    if (currentItemIsFolder) {
-                        // confirm
-                        new AlertDialog.Builder(mCurrentActivity)
-                                .setTitle(R.string.lbl_mark_unplayed)
-                                .setMessage(mCurrentActivity.getString(R.string.lbl_confirm_mark_unwatched))
-                                .setNegativeButton(mCurrentActivity.getString(R.string.lbl_no), new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface dialog, int which) {
-
-                                    }
-                                }).setPositiveButton(mCurrentActivity.getString(R.string.lbl_yes), new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                markUnplayed();
-                            }
-                        }).show();
-                    } else {
-                        markUnplayed();
-                    }
-                    return true;
-                case MENU_LIKE:
-                    toggleLikes(true);
-                    return true;
-                case MENU_DISLIKE:
-                    toggleLikes(false);
-                    return true;
-                case MENU_UNLIKE:
-                case MENU_UNDISLIKE:
-                    toggleLikes(null);
+                    markUnplayed();
                     return true;
                 case MENU_GOTO_NOW_PLAYING:
-                    Intent nowPlaying = new Intent(TvApp.getApplication(), AudioNowPlayingActivity.class);
+                    Intent nowPlaying = new Intent(mCurrentActivity, AudioNowPlayingActivity.class);
                     mCurrentActivity.startActivity(nowPlaying);
                     return true;
                 case MENU_REMOVE_FROM_QUEUE:
-                    MediaManager.removeFromAudioQueue(mCurrentRowItemNdx);
+                    KoinJavaComponent.<MediaManager>get(MediaManager.class).removeFromAudioQueue(mCurrentRowItemNdx);
                     return true;
                 case MENU_ADVANCE_QUEUE:
-                    MediaManager.playFrom(mCurrentRowItemNdx);
+                    KoinJavaComponent.<MediaManager>get(MediaManager.class).playFrom(mCurrentRowItemNdx);
                     return true;
                 case MENU_INSTANT_MIX:
-                    Utils.beep();
-                    PlaybackHelper.playInstantMix(mCurrentItemId);
+                    PlaybackHelper.playInstantMix(mCurrentActivity, mCurrentItem);
                     return true;
             }
 
@@ -492,10 +417,11 @@ public class KeyProcessor {
     };
 
     private static void markPlayed() {
-        get(ApiClient.class).MarkPlayedAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), null, new Response<UserItemDataDto>() {
+        KoinJavaComponent.<ApiClient>get(ApiClient.class).MarkPlayedAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), null, new Response<UserItemDataDto>() {
             @Override
             public void onResponse(UserItemDataDto response) {
-                mCurrentActivity.sendMessage(CustomMessage.RefreshCurrentItem);
+                if (mCurrentActivity instanceof BaseActivity)
+                    ((BaseActivity)mCurrentActivity).sendMessage(CustomMessage.RefreshCurrentItem);
             }
 
             @Override
@@ -508,10 +434,11 @@ public class KeyProcessor {
     }
 
     private static void markUnplayed() {
-        get(ApiClient.class).MarkUnplayedAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<UserItemDataDto>() {
+        KoinJavaComponent.<ApiClient>get(ApiClient.class).MarkUnplayedAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<UserItemDataDto>() {
             @Override
             public void onResponse(UserItemDataDto response) {
-                mCurrentActivity.sendMessage(CustomMessage.RefreshCurrentItem);
+                if (mCurrentActivity instanceof BaseActivity)
+                    ((BaseActivity)mCurrentActivity).sendMessage(CustomMessage.RefreshCurrentItem);
             }
 
             @Override
@@ -524,11 +451,13 @@ public class KeyProcessor {
     }
 
     private static void toggleFavorite(boolean fav) {
-        get(ApiClient.class).UpdateFavoriteStatusAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), fav, new Response<UserItemDataDto>() {
+        KoinJavaComponent.<ApiClient>get(ApiClient.class).UpdateFavoriteStatusAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), fav, new Response<UserItemDataDto>() {
             @Override
             public void onResponse(UserItemDataDto response) {
-                mCurrentActivity.sendMessage(CustomMessage.RefreshCurrentItem);
-                TvApp.getApplication().dataRefreshService.setLastFavoriteUpdate(System.currentTimeMillis());
+                if (mCurrentActivity instanceof BaseActivity)
+                    ((BaseActivity)mCurrentActivity).sendMessage(CustomMessage.RefreshCurrentItem);
+                DataRefreshService dataRefreshService = KoinJavaComponent.<DataRefreshService>get(DataRefreshService.class);
+                dataRefreshService.setLastFavoriteUpdate(System.currentTimeMillis());
             }
 
             @Override
@@ -537,39 +466,6 @@ public class KeyProcessor {
                 Utils.showToast(mCurrentActivity, R.string.favorite_error);
             }
         });
-
-    }
-
-    private static void toggleLikes(Boolean likes) {
-        if (likes == null) {
-            get(ApiClient.class).ClearUserItemRatingAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), new Response<UserItemDataDto>() {
-                @Override
-                public void onResponse(UserItemDataDto response) {
-                    mCurrentActivity.sendMessage(CustomMessage.RefreshCurrentItem);
-                }
-
-                @Override
-                public void onError(Exception exception) {
-                    Timber.e(exception, "Error clearing like status");
-                    Utils.showToast(mCurrentActivity, R.string.like_clearing_error);
-                }
-            });
-
-        } else {
-            get(ApiClient.class).UpdateUserItemRatingAsync(mCurrentItemId, TvApp.getApplication().getCurrentUser().getId(), likes, new Response<UserItemDataDto>() {
-                @Override
-                public void onResponse(UserItemDataDto response) {
-                    mCurrentActivity.sendMessage(CustomMessage.RefreshCurrentItem);
-                }
-
-                @Override
-                public void onError(Exception exception) {
-                    Timber.e(exception, "Error setting like status");
-                    Utils.showToast(mCurrentActivity, R.string.like_setting_error);
-                }
-            });
-        }
-
     }
 }
 

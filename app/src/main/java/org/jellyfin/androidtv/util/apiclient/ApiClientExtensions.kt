@@ -1,15 +1,30 @@
 package org.jellyfin.androidtv.util.apiclient
 
 import org.jellyfin.androidtv.TvApp
-import org.jellyfin.androidtv.data.itemtypes.*
+import org.jellyfin.androidtv.data.itemtypes.Album
+import org.jellyfin.androidtv.data.itemtypes.Artist
+import org.jellyfin.androidtv.data.itemtypes.Audio
+import org.jellyfin.androidtv.data.itemtypes.BaseItem
+import org.jellyfin.androidtv.data.itemtypes.Episode
+import org.jellyfin.androidtv.data.itemtypes.FIELDS_REQUIRED_FOR_LIFT
+import org.jellyfin.androidtv.data.itemtypes.LocalTrailer
+import org.jellyfin.androidtv.data.itemtypes.Season
+import org.jellyfin.androidtv.data.itemtypes.Series
 import org.jellyfin.androidtv.data.querying.StdItemQuery
 import org.jellyfin.apiclient.interaction.ApiClient
+import org.jellyfin.apiclient.interaction.EmptyResponse
 import org.jellyfin.apiclient.interaction.Response
 import org.jellyfin.apiclient.model.dto.BaseItemDto
 import org.jellyfin.apiclient.model.dto.BaseItemType
 import org.jellyfin.apiclient.model.dto.UserItemDataDto
-import org.jellyfin.apiclient.model.querying.*
-import java.util.*
+import org.jellyfin.apiclient.model.querying.ItemFields
+import org.jellyfin.apiclient.model.querying.ItemQuery
+import org.jellyfin.apiclient.model.querying.ItemsResult
+import org.jellyfin.apiclient.model.querying.NextUpQuery
+import org.jellyfin.apiclient.model.querying.SeasonQuery
+import org.jellyfin.apiclient.model.querying.SimilarItemsQuery
+import java.util.Date
+import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -38,10 +53,24 @@ suspend fun ApiClient.getUserViews(): ItemsResult? = suspendCoroutine { continua
  * Adds a coroutine capable version of the "GetItem" function
  * Uses the userId of the currently signed in user
  */
-suspend fun ApiClient.getItem(id: String): BaseItemDto? = suspendCoroutine { continuation ->
-	GetItemAsync(id, TvApp.getApplication().currentUser.id, object : Response<BaseItemDto>() {
+suspend fun ApiClient.getItem(id: String, userId: UUID): BaseItemDto? = suspendCoroutine { continuation ->
+	GetItemAsync(id,  userId.toString(), object : Response<BaseItemDto>() {
 		override fun onResponse(response: BaseItemDto?) = continuation.resume(response!!)
 		override fun onError(exception: Exception?) = continuation.resume(null)
+	})
+}
+
+suspend fun <T : Any?> callApi(init: (callback: Response<T>) -> Unit): T = suspendCoroutine { continuation ->
+	init(object : Response<T>() {
+		override fun onResponse(response: T) = continuation.resumeWith(Result.success(response))
+		override fun onError(exception: Exception) = continuation.resumeWith(Result.failure(exception))
+	})
+}
+
+suspend fun callApiEmpty(init: (callback: EmptyResponse) -> Unit): Unit = suspendCoroutine { continuation ->
+	init(object : EmptyResponse() {
+		override fun onResponse() = continuation.resumeWith(Result.success(Unit))
+		override fun onError(exception: Exception) = continuation.resumeWith(Result.failure(exception))
 	})
 }
 

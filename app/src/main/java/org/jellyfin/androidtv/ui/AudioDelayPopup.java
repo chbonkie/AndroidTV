@@ -8,8 +8,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.PopupWindow;
 
-import org.jellyfin.androidtv.R;
-import org.jellyfin.androidtv.TvApp;
+import androidx.annotation.Nullable;
+
+import org.jellyfin.androidtv.databinding.AudioDelayPopupBinding;
 import org.jellyfin.androidtv.util.Utils;
 
 public class AudioDelayPopup {
@@ -19,20 +20,25 @@ public class AudioDelayPopup {
 
     public AudioDelayPopup(Context context, View anchor, ValueChangedListener<Long> listener) {
         LayoutInflater inflater = LayoutInflater.from(context);
-        View layout = inflater.inflate(R.layout.audio_delay_popup, null);
+        AudioDelayPopupBinding binding = AudioDelayPopupBinding.inflate(inflater, null, false);
 
-        int width = Utils.convertDpToPixel(TvApp.getApplication(), 240);
-        int height = Utils.convertDpToPixel(TvApp.getApplication(), 130);
+        int width = Utils.convertDpToPixel(context, 240);
+        int height = Utils.convertDpToPixel(context, 130);
 
-        mPopup = new PopupWindow(layout, width, height);
+        mPopup = new PopupWindow(binding.getRoot(), width, height);
         mPopup.setFocusable(true);
         mPopup.setOutsideTouchable(true);
         mPopup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT)); // necessary for popup to dismiss
 
         mAnchor = anchor;
 
-        mDelaySpinner = layout.findViewById(R.id.numberSpinner);
+        mDelaySpinner = binding.numberSpinner;
         mDelaySpinner.setOnChangeListener(listener);
+    }
+
+    @Nullable
+    public PopupWindow getPopupWindow() {
+        return mPopup;
     }
 
     public boolean isShowing() {
@@ -41,12 +47,6 @@ public class AudioDelayPopup {
 
     public void show(long value) {
         mDelaySpinner.setValue(value);
-        mPopup.showAtLocation(mAnchor, Gravity.CENTER_VERTICAL, mAnchor.getRight() - 60, mAnchor.getTop());
-    }
-
-    public void dismiss() {
-        if (mPopup != null && mPopup.isShowing()) {
-            mPopup.dismiss();
-        }
+        mPopup.showAsDropDown(mAnchor, 0, 0, Gravity.END);
     }
 }

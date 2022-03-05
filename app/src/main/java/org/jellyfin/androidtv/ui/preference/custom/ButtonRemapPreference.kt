@@ -5,13 +5,13 @@ import android.util.AttributeSet
 import android.view.KeyEvent
 import androidx.preference.DialogPreference
 import org.jellyfin.androidtv.R
-import java.util.*
+import java.util.Locale
 
 class ButtonRemapPreference(
 	context: Context,
 	attrs: AttributeSet? = null
 ) : DialogPreference(context, attrs) {
-	override fun getDialogLayoutResource() = R.layout.button_remap_preference
+	override fun getDialogLayoutResource() = R.layout.preference_button_remap
 
 	private var innerKeyCode: Int = -1
 	var keyCode: Int
@@ -34,10 +34,10 @@ class ButtonRemapPreference(
 			return if (keyCodeString.startsWith("KEYCODE")) {
 				keyCodeString
 					.removePrefix("KEYCODE_")
-					.toLowerCase(Locale.getDefault())
+					.lowercase(Locale.getDefault())
 					.split("_")
 					.joinToString(" ") {
-						it.capitalize()
+						it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(Locale.getDefault()) else char.toString() }
 					}
 			} else {
 				context.getString(R.string.lbl_unknown_key, keyCodeString)

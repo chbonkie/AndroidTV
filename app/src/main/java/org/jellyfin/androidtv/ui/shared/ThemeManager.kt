@@ -5,13 +5,13 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.constant.AppTheme
 import org.jellyfin.androidtv.ui.preference.PreferencesActivity
-import org.koin.core.KoinComponent
-import org.koin.core.get
-import java.util.*
+import org.koin.android.ext.android.get
+import java.util.Calendar
+import java.util.GregorianCalendar
 
-object ThemeManager : KoinComponent {
-	private fun showAprilFools(): Boolean {
-		val enableGreetings = get<UserPreferences>()[UserPreferences.seasonalGreetingsEnabled]
+object ThemeManager {
+	private fun showAprilFools(userPreferences: UserPreferences): Boolean {
+		val enableGreetings = userPreferences[UserPreferences.seasonalGreetingsEnabled]
 		if (!enableGreetings) return false
 
 		val today = GregorianCalendar()
@@ -24,13 +24,14 @@ object ThemeManager : KoinComponent {
 			return R.style.Theme_Jellyfin_Preferences
 		}
 
-		if (showAprilFools()) {
-			return R.style.Theme_Jellyfin_HotDogStand;
+		if (showAprilFools(activity.get())) {
+			return R.style.Theme_Jellyfin_HotDogStand
 		}
 
 		return when (appTheme) {
 			AppTheme.DARK -> R.style.Theme_Jellyfin
 			AppTheme.EMERALD -> R.style.Theme_Jellyfin_Emerald
+			AppTheme.MUTED_PURPLE -> R.style.Theme_Jellyfin_MutedPurple
 			AppTheme.HOT_DOG_STAND -> R.style.Theme_Jellyfin_HotDogStand
 		}
 	}

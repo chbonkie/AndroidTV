@@ -4,32 +4,35 @@ import org.jellyfin.androidtv.data.compat.AudioOptions;
 import org.jellyfin.androidtv.data.compat.PlaybackException;
 import org.jellyfin.androidtv.data.compat.StreamInfo;
 import org.jellyfin.androidtv.data.compat.VideoOptions;
-
 import org.jellyfin.apiclient.interaction.ApiClient;
 import org.jellyfin.apiclient.interaction.QueryStringDictionary;
 import org.jellyfin.apiclient.interaction.Response;
 import org.jellyfin.apiclient.model.dlna.DlnaProfileType;
+import org.jellyfin.apiclient.model.dlna.PlaybackErrorCode;
 import org.jellyfin.apiclient.model.dto.MediaSourceInfo;
 import org.jellyfin.apiclient.model.mediainfo.LiveStreamRequest;
 import org.jellyfin.apiclient.model.mediainfo.LiveStreamResponse;
 import org.jellyfin.apiclient.model.mediainfo.MediaProtocol;
 import org.jellyfin.apiclient.model.mediainfo.PlaybackInfoResponse;
 import org.jellyfin.apiclient.model.session.PlayMethod;
+import org.jellyfin.sdk.model.DeviceInfo;
 
 import java.util.ArrayList;
 
 @Deprecated
 public class GetPlaybackInfoResponse extends Response<PlaybackInfoResponse> {
     private PlaybackManager playbackManager;
+    private final DeviceInfo deviceInfo;
     private ApiClient apiClient;
     private AudioOptions options;
     private Response<StreamInfo> response;
     private boolean isVideo;
     private Long startPositionTicks;
 
-    public GetPlaybackInfoResponse(PlaybackManager playbackManager, ApiClient apiClient, AudioOptions options, Response<StreamInfo> response, boolean isVideo, Long startPositionTicks) {
+    public GetPlaybackInfoResponse(PlaybackManager playbackManager, DeviceInfo deviceInfo, ApiClient apiClient, AudioOptions options, Response<StreamInfo> response, boolean isVideo, Long startPositionTicks) {
         super(response);
         this.playbackManager = playbackManager;
+        this.deviceInfo = deviceInfo;
         this.apiClient = apiClient;
         this.options = options;
         this.response = response;
@@ -94,16 +97,46 @@ public class GetPlaybackInfoResponse extends Response<PlaybackInfoResponse> {
 
         streamInfo.setContext(options.getContext());
         streamInfo.setItemId(options.getItemId());
-        streamInfo.setDeviceId(apiClient.getDeviceId());
+        streamInfo.setDeviceId(deviceInfo.getId());
         streamInfo.setDeviceProfile(options.getProfile());
         streamInfo.setPlaySessionId(playbackInfo.getPlaySessionId());
-        streamInfo.setAllMediaSources(playbackInfo.getMediaSources());
         streamInfo.setStartPositionTicks(startPositionTicks);
 
-        if (options.getEnableDirectPlay() && mediaSourceInfo.getSupportsDirectPlay() && canDirectPlay(mediaSourceInfo)){
-            streamInfo.setPlayMethod(PlayMethod.DirectPlay);
-            streamInfo.setContainer(mediaSourceInfo.getContainer());
-            streamInfo.setMediaUrl(mediaSourceInfo.getPath());
+        if (options.getEnableDirectPlay() && mediaSourceInfo.getSupportsDirectPlay()){
+            if (canDirectPlay(mediaSourceInfo)) {
+                streamInfo.setPlayMethod(PlayMethod.DirectPlay);
+                streamInfo.setContainer(mediaSourceInfo.getContainer());
+                streamInfo.setMediaUrl(mediaSourceInfo.getPath());
+            } else {
+                String outputContainer = mediaSourceInfo.getContainer();
+                if (outputContainer == null){
+                    outputContainer = "";
+                }
+                outputContainer = outputContainer.toLowerCase();
+
+                streamInfo.setPlayMethod(PlayMethod.DirectPlay);
+                streamInfo.setContainer(mediaSourceInfo.getContainer());
+
+                QueryStringDictionary dict = new QueryStringDictionary();
+                dict.put("Static", "true");
+                dict.put("MediaSourceId", mediaSourceInfo.getId());
+                dict.put("DeviceId", deviceInfo.getId());
+                dict.put("api_key", apiClient.getAccessToken());
+
+                if (mediaSourceInfo.getETag() != null && mediaSourceInfo.getETag().length() > 0){
+                    dict.put("Tag", mediaSourceInfo.getETag());
+                }
+
+                if (mediaSourceInfo.getLiveStreamId() != null && mediaSourceInfo.getLiveStreamId().length() > 0){
+                    dict.put("LiveStreamId", mediaSourceInfo.getLiveStreamId());
+                }
+
+                String handler = isVideo ? "Videos" : "Audio";
+                String mediaUrl = apiClient.GetApiUrl(handler + "/"+options.getItemId()+"/stream." + outputContainer, dict);
+                //mediaUrl += seekParam;
+
+                streamInfo.setMediaUrl(mediaUrl);
+            }
         } else if (options.getEnableDirectStream() && mediaSourceInfo.getSupportsDirectStream()){
             String outputContainer = mediaSourceInfo.getContainer();
             if (outputContainer == null){
@@ -117,7 +150,7 @@ public class GetPlaybackInfoResponse extends Response<PlaybackInfoResponse> {
             QueryStringDictionary dict = new QueryStringDictionary();
             dict.put("Static", "true");
             dict.put("MediaSourceId", mediaSourceInfo.getId());
-            dict.put("DeviceId", apiClient.getDeviceId());
+            dict.put("DeviceId", deviceInfo.getId());
             dict.put("api_key", apiClient.getAccessToken());
 
             if (mediaSourceInfo.getETag() != null && mediaSourceInfo.getETag().length() > 0){
@@ -138,6 +171,14 @@ public class GetPlaybackInfoResponse extends Response<PlaybackInfoResponse> {
             streamInfo.setPlayMethod(PlayMethod.Transcode);
             streamInfo.setContainer(mediaSourceInfo.getTranscodingContainer());
             streamInfo.setMediaUrl(apiClient.GetApiUrl(mediaSourceInfo.getTranscodingUrl()));
+        }
+
+        // A null url will crash the app, make sure to call onError instead
+        if (streamInfo.getMediaUrl() == null) {
+            PlaybackException exception = new PlaybackException();
+            exception.setErrorCode(PlaybackErrorCode.NoCompatibleStream);
+            response.onError(exception);
+            return;
         }
 
         playbackManager.SendResponse(response, streamInfo);

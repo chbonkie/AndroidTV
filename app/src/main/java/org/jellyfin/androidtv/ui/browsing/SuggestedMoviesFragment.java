@@ -14,8 +14,7 @@ import org.jellyfin.apiclient.model.querying.ItemFields;
 import org.jellyfin.apiclient.model.querying.ItemSortBy;
 import org.jellyfin.apiclient.model.querying.ItemsResult;
 import org.jellyfin.apiclient.model.querying.SimilarItemsQuery;
-
-import static org.koin.java.KoinJavaComponent.get;
+import org.koin.java.KoinJavaComponent;
 
 public class SuggestedMoviesFragment extends EnhancedBrowseFragment {
     @Override
@@ -25,7 +24,7 @@ public class SuggestedMoviesFragment extends EnhancedBrowseFragment {
     }
 
     @Override
-    protected void setupQueries(final IRowLoader rowLoader) {
+    protected void setupQueries(final RowLoader rowLoader) {
         StdItemQuery lastPlayed = new StdItemQuery();
         lastPlayed.setParentId(mFolder.getId());
         lastPlayed.setIncludeItemTypes(new String[]{"Movie"});
@@ -35,7 +34,7 @@ public class SuggestedMoviesFragment extends EnhancedBrowseFragment {
         lastPlayed.setLimit(8);
         lastPlayed.setRecursive(true);
 
-        get(ApiClient.class).GetItemsAsync(lastPlayed, new Response<ItemsResult>() {
+        KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemsAsync(lastPlayed, new Response<ItemsResult>() {
             @Override
             public void onResponse(ItemsResult response) {
                 for (BaseItemDto item : response.getItems()) {
@@ -44,10 +43,12 @@ public class SuggestedMoviesFragment extends EnhancedBrowseFragment {
                     similar.setFields(new ItemFields[] {
                             ItemFields.PrimaryImageAspectRatio,
                             ItemFields.Overview,
-                            ItemFields.ChildCount
+                            ItemFields.ChildCount,
+                            ItemFields.MediaStreams,
+                            ItemFields.MediaSources
                     });
                     similar.setLimit(7);
-                    mRows.add(new BrowseRowDef(mApplication.getString(R.string.lbl_because_you_watched)+item.getName(), similar, QueryType.SimilarMovies));
+                    mRows.add(new BrowseRowDef(getString(R.string.lbl_because_you_watched)+item.getName(), similar, QueryType.SimilarMovies));
                 }
 
                 rowLoader.loadRows(mRows);

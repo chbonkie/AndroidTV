@@ -1,5 +1,8 @@
 package org.jellyfin.androidtv.ui.itemhandling;
 
+import static org.koin.java.KoinJavaComponent.inject;
+
+import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.text.format.DateUtils;
 
@@ -31,8 +34,6 @@ import java.util.Arrays;
 import java.util.Date;
 
 import kotlin.Lazy;
-
-import static org.koin.java.KoinJavaComponent.inject;
 
 public class BaseRowItem {
     private int index;
@@ -222,49 +223,49 @@ public class BaseRowItem {
         }
     }
 
-    public String getImageUrl(String imageType, int maxHeight) {
+    public String getImageUrl(Context context, org.jellyfin.androidtv.constant.ImageType imageType, int maxHeight) {
         switch (type) {
             case BaseItem:
             case LiveTvProgram:
             case LiveTvRecording:
                 switch (imageType) {
-                    case org.jellyfin.androidtv.constant.ImageType.BANNER:
-                        return ImageUtils.getBannerImageUrl(baseItem, apiClient.getValue(), maxHeight);
-                    case org.jellyfin.androidtv.constant.ImageType.THUMB:
-                        return ImageUtils.getThumbImageUrl(baseItem, apiClient.getValue(), maxHeight);
+                    case BANNER:
+                        return ImageUtils.getBannerImageUrl(context, baseItem, apiClient.getValue(), maxHeight);
+                    case THUMB:
+                        return ImageUtils.getThumbImageUrl(context, baseItem, apiClient.getValue(), maxHeight);
                     default:
-                        return getPrimaryImageUrl(maxHeight);
+                        return getPrimaryImageUrl(context, maxHeight);
                 }
             default:
-                return getPrimaryImageUrl(maxHeight);
+                return getPrimaryImageUrl(context, maxHeight);
         }
     }
 
-    public String getPrimaryImageUrl(int maxHeight) {
+    public String getPrimaryImageUrl(Context context, int maxHeight) {
         switch (type) {
             case BaseItem:
             case LiveTvProgram:
             case LiveTvRecording:
-                return ImageUtils.getPrimaryImageUrl(baseItem, apiClient.getValue(), preferParentThumb, maxHeight);
+                return ImageUtils.getPrimaryImageUrl(context, baseItem, preferParentThumb, maxHeight);
             case Person:
-                return ImageUtils.getPrimaryImageUrl(person, apiClient.getValue(), maxHeight);
+                return ImageUtils.getPrimaryImageUrl(person, maxHeight);
             case User:
-                return ImageUtils.getPrimaryImageUrl(user, apiClient.getValue());
+                return ImageUtils.getPrimaryImageUrl(user);
             case Chapter:
                 return chapterInfo.getImagePath();
             case LiveTvChannel:
                 return ImageUtils.getPrimaryImageUrl(channelInfo, apiClient.getValue());
             case Server:
-                return ImageUtils.getResourceUrl(R.drawable.tile_port_server);
+                return ImageUtils.getResourceUrl(context, R.drawable.tile_port_server);
             case GridButton:
-                return ImageUtils.getResourceUrl(gridButton.getImageIndex());
+                return ImageUtils.getResourceUrl(context, gridButton.getImageRes());
             case SeriesTimer:
-                return ImageUtils.getResourceUrl(R.drawable.tile_land_series_timer);
+                return ImageUtils.getResourceUrl(context, R.drawable.tile_land_series_timer);
             case SearchHint:
                 if (Utils.isNonEmpty(searchHint.getPrimaryImageTag())) {
-                    return ImageUtils.getImageUrl(searchHint.getItemId(), ImageType.Primary, searchHint.getPrimaryImageTag(), apiClient.getValue());
+                    return ImageUtils.getImageUrl(searchHint.getItemId(), ImageType.Primary, searchHint.getPrimaryImageTag());
                 } else if (Utils.isNonEmpty(searchHint.getThumbImageItemId())) {
-                    return ImageUtils.getImageUrl(searchHint.getThumbImageItemId(), ImageType.Thumb, searchHint.getThumbImageTag(), apiClient.getValue());
+                    return ImageUtils.getImageUrl(searchHint.getThumbImageItemId(), ImageType.Thumb, searchHint.getThumbImageTag());
                 }
         }
         return null;
@@ -308,23 +309,23 @@ public class BaseRowItem {
         return false;
     }
 
-    public String getCardName() {
+    public String getCardName(Context context) {
         switch (type) {
             case BaseItem:
                 if (baseItem.getBaseItemType() == BaseItemType.Audio) {
                     return baseItem.getAlbumArtist() != null ? baseItem.getAlbumArtist() : baseItem.getAlbum() != null ? baseItem.getAlbum() : "<Unknown>";
                 }
             default:
-                return getFullName();
+                return getFullName(context);
         }
     }
 
-    public String getFullName() {
+    public String getFullName(Context context) {
         switch (type) {
             case BaseItem:
             case LiveTvProgram:
             case LiveTvRecording:
-                return BaseItemUtils.getFullName(baseItem);
+                return BaseItemUtils.getFullName(baseItem, context);
             case Person:
                 return person.getName();
             case Chapter:
@@ -343,15 +344,15 @@ public class BaseRowItem {
                 return (searchHint.getSeries() != null ? searchHint.getSeries() + " - " : "") + searchHint.getName();
         }
 
-        return TvApp.getApplication().getString(R.string.lbl_bracket_unknown);
+        return context.getString(R.string.lbl_bracket_unknown);
     }
 
-    public String getName() {
+    public String getName(Context context) {
         switch (type) {
             case BaseItem:
             case LiveTvRecording:
             case LiveTvProgram:
-                return baseItem.getBaseItemType() == BaseItemType.Audio ? getFullName() : baseItem.getName();
+                return baseItem.getBaseItemType() == BaseItemType.Audio ? getFullName(context) : baseItem.getName();
             case Person:
                 return person.getName();
             case Server:
@@ -370,7 +371,7 @@ public class BaseRowItem {
                 return seriesTimerInfo.getName();
         }
 
-        return TvApp.getApplication().getString(R.string.lbl_bracket_unknown);
+        return context.getString(R.string.lbl_bracket_unknown);
     }
 
     public String getItemId() {
@@ -400,10 +401,10 @@ public class BaseRowItem {
         return null;
     }
 
-    public String getSubText() {
+    public String getSubText(Context context) {
         switch (type) {
             case BaseItem:
-                return BaseItemUtils.getSubName(baseItem);
+                return BaseItemUtils.getSubName(baseItem, context);
             case Person:
                 return person.getRole();
             case Chapter:
@@ -418,11 +419,11 @@ public class BaseRowItem {
             case LiveTvRecording:
                 return (baseItem.getChannelName() != null ? baseItem.getChannelName() + " - " : "") + (baseItem.getEpisodeTitle() != null ? baseItem.getEpisodeTitle() : "") + " " +
                         new SimpleDateFormat("d MMM").format(TimeUtils.convertToLocalDate(baseItem.getStartDate())) + " " +
-                        (android.text.format.DateFormat.getTimeFormat(TvApp.getApplication()).format(TimeUtils.convertToLocalDate(baseItem.getStartDate())) + "-"
-                                + android.text.format.DateFormat.getTimeFormat(TvApp.getApplication()).format(TimeUtils.convertToLocalDate(baseItem.getEndDate())));
+                        (android.text.format.DateFormat.getTimeFormat(context).format(TimeUtils.convertToLocalDate(baseItem.getStartDate())) + "-"
+                                + android.text.format.DateFormat.getTimeFormat(context).format(TimeUtils.convertToLocalDate(baseItem.getEndDate())));
             case User:
                 Date date = user.getLastActivityDate();
-                return date != null ? DateUtils.getRelativeTimeSpanString(TimeUtils.convertToLocalDate(date).getTime()).toString() : TvApp.getApplication().getString(R.string.lbl_never);
+                return date != null ? DateUtils.getRelativeTimeSpanString(TimeUtils.convertToLocalDate(date).getTime()).toString() : context.getString(R.string.lbl_never);
             case SearchHint:
                 return searchHint.getType();
             case SeriesTimer:
@@ -439,7 +440,7 @@ public class BaseRowItem {
             return null;
     }
 
-    public String getSummary() {
+    public String getSummary(Context context) {
         switch (type) {
             case BaseItem:
             case LiveTvRecording:
@@ -454,7 +455,7 @@ public class BaseRowItem {
             case GridButton:
                 break;
             case SeriesTimer:
-                return BaseItemUtils.getSeriesOverview(seriesTimerInfo);
+                return BaseItemUtils.getSeriesOverview(seriesTimerInfo, context);
         }
 
         return "";
@@ -508,21 +509,13 @@ public class BaseRowItem {
         }
     }
 
-    public String getBackdropImageUrl() {
-        if (type == ItemType.BaseItem) {
-            return ImageUtils.getBackdropImageUrl(baseItem, apiClient.getValue(), true);
-        }
-
-        return null;
-    }
-
-    public Drawable getBadgeImage() {
+    public Drawable getBadgeImage(Context context) {
         switch (type) {
             case BaseItem:
                 if (baseItem.getBaseItemType() == BaseItemType.Movie && baseItem.getCriticRating() != null) {
-                    return baseItem.getCriticRating() > 59 ? ContextCompat.getDrawable(TvApp.getApplication(), R.drawable.fresh) : ContextCompat.getDrawable(TvApp.getApplication(), R.drawable.rotten);
+                    return baseItem.getCriticRating() > 59 ? ContextCompat.getDrawable(context, R.drawable.ic_rt_fresh) : ContextCompat.getDrawable(context, R.drawable.ic_rt_rotten);
                 } else if (baseItem.getBaseItemType() == BaseItemType.Program && baseItem.getTimerId() != null) {
-                    return baseItem.getSeriesTimerId() != null ? ContextCompat.getDrawable(TvApp.getApplication(), R.drawable.ic_record_series_red) : ContextCompat.getDrawable(TvApp.getApplication(), R.drawable.ic_record_red);
+                    return baseItem.getSeriesTimerId() != null ? ContextCompat.getDrawable(context, R.drawable.ic_record_series_red) : ContextCompat.getDrawable(context, R.drawable.ic_record_red);
                 }
                 break;
             case Person:
@@ -530,18 +523,18 @@ public class BaseRowItem {
                 break;
             case User:
                 if (user.getHasPassword()) {
-                    return ContextCompat.getDrawable(TvApp.getApplication(), R.drawable.ic_lock);
+                    return ContextCompat.getDrawable(context, R.drawable.ic_lock);
                 }
                 break;
             case LiveTvProgram:
                 if (baseItem.getTimerId() != null) {
-                    return baseItem.getSeriesTimerId() != null ? ContextCompat.getDrawable(TvApp.getApplication(), R.drawable.ic_record_series_red) : ContextCompat.getDrawable(TvApp.getApplication(), R.drawable.ic_record_red);
+                    return baseItem.getSeriesTimerId() != null ? ContextCompat.getDrawable(context, R.drawable.ic_record_series_red) : ContextCompat.getDrawable(context, R.drawable.ic_record_red);
                 }
             case Chapter:
                 break;
         }
 
-        return ContextCompat.getDrawable(TvApp.getApplication(), R.drawable.blank10x10);
+        return ContextCompat.getDrawable(context, R.drawable.blank10x10);
     }
 
     public void refresh(final EmptyResponse outerResponse) {

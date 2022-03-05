@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.annotation.StringRes
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
+import kotlin.properties.ReadOnlyProperty
 
 class OptionsScreen(
 	private val context: Context
@@ -15,6 +16,9 @@ class OptionsScreen(
 		title = context.getString(resId)
 	}
 
+	/**
+	 * Create a category.
+	 */
 	fun category(init: OptionsCategory.() -> Unit) {
 		val category = OptionsCategory(context)
 			.apply { init() }
@@ -23,11 +27,39 @@ class OptionsScreen(
 	}
 
 	/**
+	 * Create a link inside of a category.
+	 */
+	@OptionsDSL
+	fun link(init: OptionsLink.() -> Unit) {
+		val category = OptionsCategory(context)
+		category += OptionsLink(context).apply { init() }
+
+		nodes.add(category)
+	}
+
+	/**
+	 * Create an action inside of a category.
+	 */
+	@OptionsDSL
+	fun action(init: OptionsAction.() -> Unit) {
+		val category = OptionsCategory(context)
+		category += OptionsAction(context).apply { init() }
+
+		nodes.add(category)
+	}
+
+	/**
 	 * Create androidx PreferenceScreen instance.
 	 */
-	fun build(preferenceManager: PreferenceManager): PreferenceScreen {
+	fun build(
+		preferenceManager: PreferenceManager,
+		preferenceScreen: PreferenceScreen = preferenceManager.createPreferenceScreen(context)
+	): PreferenceScreen {
 		val container = OptionsUpdateFunContainer()
-		return preferenceManager.createPreferenceScreen(context).also {
+		return preferenceScreen.also {
+			// Clear current preferences in re-used screen
+			it.removeAll()
+
 			it.isPersistent = false
 			it.title = title
 			nodes.forEach { node ->
@@ -38,6 +70,8 @@ class OptionsScreen(
 }
 
 @OptionsDSL
-fun optionsScreen(context: Context, init: OptionsScreen.() -> Unit) =
-	OptionsScreen(context)
-		.apply { init() }
+fun OptionsFragment.optionsScreen(
+	init: OptionsScreen.() -> Unit
+) = ReadOnlyProperty<OptionsFragment, OptionsScreen> { _, _ ->
+	OptionsScreen(requireContext()).apply { init() }
+}

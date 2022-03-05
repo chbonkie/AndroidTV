@@ -1,14 +1,18 @@
 package org.jellyfin.androidtv.ui.itemhandling;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.view.KeyEvent;
+
+import androidx.core.util.Consumer;
 
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.constant.Extras;
-import org.jellyfin.androidtv.constant.ViewType;
 import org.jellyfin.androidtv.data.model.ChapterItemInfo;
+import org.jellyfin.androidtv.preference.LibraryPreferences;
+import org.jellyfin.androidtv.preference.PreferencesRepository;
 import org.jellyfin.androidtv.ui.browsing.BrowseRecordingsActivity;
 import org.jellyfin.androidtv.ui.browsing.BrowseScheduleActivity;
 import org.jellyfin.androidtv.ui.browsing.CollectionActivity;
@@ -20,86 +24,76 @@ import org.jellyfin.androidtv.ui.itemdetail.ItemListActivity;
 import org.jellyfin.androidtv.ui.itemdetail.PhotoPlayerActivity;
 import org.jellyfin.androidtv.ui.livetv.LiveTvGuideActivity;
 import org.jellyfin.androidtv.ui.playback.MediaManager;
+import org.jellyfin.androidtv.ui.playback.PlaybackLauncher;
 import org.jellyfin.androidtv.ui.shared.BaseActivity;
 import org.jellyfin.androidtv.util.KeyProcessor;
 import org.jellyfin.androidtv.util.Utils;
-import org.jellyfin.androidtv.util.apiclient.AuthenticationHelper;
 import org.jellyfin.androidtv.util.apiclient.PlaybackHelper;
 import org.jellyfin.apiclient.interaction.ApiClient;
 import org.jellyfin.apiclient.interaction.Response;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
 import org.jellyfin.apiclient.model.dto.BaseItemType;
-import org.jellyfin.apiclient.model.dto.UserDto;
-import org.jellyfin.apiclient.model.entities.DisplayPreferences;
 import org.jellyfin.apiclient.model.library.PlayAccess;
 import org.jellyfin.apiclient.model.livetv.ChannelInfoDto;
 import org.jellyfin.apiclient.model.search.SearchHint;
 import org.jellyfin.apiclient.serialization.GsonJsonSerializer;
+import org.koin.java.KoinJavaComponent;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import timber.log.Timber;
 
-import static org.koin.java.KoinJavaComponent.get;
-
 public class ItemLauncher {
     public static void launch(BaseRowItem rowItem, ItemRowAdapter adapter, int pos, final Activity activity) {
         launch(rowItem, adapter, pos, activity, false);
     }
 
-    public static void launchUserView(final BaseItemDto baseItem, final Activity context, final boolean finishParent) {
-        //We need to get display prefs...
-        TvApp.getApplication().getDisplayPrefsAsync(baseItem.getDisplayPreferencesId(), new Response<DisplayPreferences>() {
-            @Override
-            public void onResponse(DisplayPreferences response) {
-                if (baseItem.getCollectionType() == null) {
-                    baseItem.setCollectionType("unknown");
+    public static void createUserViewIntent(final BaseItemDto baseItem, final Context context, final Consumer<Intent> callback) {
+        if (baseItem.getCollectionType() == null) {
+            baseItem.setCollectionType("unknown");
+        }
+        Timber.d("**** Collection type: %s", baseItem.getCollectionType());
+        Intent intent;
+        switch (baseItem.getCollectionType()) {
+            case "movies":
+            case "tvshows":
+                LibraryPreferences displayPreferences = KoinJavaComponent.<PreferencesRepository>get(PreferencesRepository.class).getLibraryPreferences(baseItem.getDisplayPreferencesId());
+                boolean enableSmartScreen = displayPreferences.get(LibraryPreferences.Companion.getEnableSmartScreen());
+                if (!enableSmartScreen) {
+                    // open grid browsing
+                    intent = new Intent(context, GenericGridActivity.class);
+                    intent.putExtra(Extras.Folder, KoinJavaComponent.<GsonJsonSerializer>get(GsonJsonSerializer.class).SerializeToString(baseItem));
+                } else {
+                    // open user view browsing
+                    intent = new Intent(context, UserViewActivity.class);
+                    intent.putExtra(Extras.Folder, KoinJavaComponent.<GsonJsonSerializer>get(GsonJsonSerializer.class).SerializeToString(baseItem));
                 }
-                Timber.d("**** Collection type: %s", baseItem.getCollectionType());
-                switch (baseItem.getCollectionType()) {
-                    case "movies":
-                    case "tvshows":
-                    case "music":
-                        Timber.d("**** View Type Pref: %s", response.getCustomPrefs().get("DefaultView"));
-                        if (ViewType.GRID.equals(response.getCustomPrefs().get("DefaultView"))) {
-                            // open grid browsing
-                            Intent folderIntent = new Intent(context, GenericGridActivity.class);
-                            folderIntent.putExtra(Extras.Folder, get(GsonJsonSerializer.class).SerializeToString(baseItem));
-                            context.startActivity(folderIntent);
-                            if (finishParent) context.finish();
+                break;
+            case "music":
+            case "livetv":
+                // open user view browsing
+                intent = new Intent(context, UserViewActivity.class);
+                intent.putExtra(Extras.Folder, KoinJavaComponent.<GsonJsonSerializer>get(GsonJsonSerializer.class).SerializeToString(baseItem));
+                break;
+            default:
+                // open generic folder browsing
+                intent = new Intent(context, GenericGridActivity.class);
+                intent.putExtra(Extras.Folder, KoinJavaComponent.<GsonJsonSerializer>get(GsonJsonSerializer.class).SerializeToString(baseItem));
+        }
 
-                        } else {
-                            // open user view browsing
-                            Intent intent = new Intent(context, UserViewActivity.class);
-                            intent.putExtra(Extras.Folder, get(GsonJsonSerializer.class).SerializeToString(baseItem));
+        callback.accept(intent);
+    }
 
-                            context.startActivity(intent);
-                            if (finishParent) context.finish();
-                        }
-                        break;
-                    case "livetv":
-                        // open user view browsing
-                        Intent intent = new Intent(context, UserViewActivity.class);
-                        intent.putExtra(Extras.Folder, get(GsonJsonSerializer.class).SerializeToString(baseItem));
-
-                        context.startActivity(intent);
-                        if (finishParent) context.finish();
-                        break;
-                    default:
-                        // open generic folder browsing
-                        Intent folderIntent = new Intent(context, GenericGridActivity.class);
-                        folderIntent.putExtra(Extras.Folder, get(GsonJsonSerializer.class).SerializeToString(baseItem));
-                        context.startActivity(folderIntent);
-                        if (finishParent) context.finish();
-                }
-            }
+    public static void launchUserView(final BaseItemDto baseItem, final Activity activity, final boolean finishParent) {
+        createUserViewIntent(baseItem, activity, intent -> {
+            activity.startActivity(intent);
+            if (finishParent) activity.finishAfterTransition();
         });
     }
 
     public static void launch(final BaseRowItem rowItem, ItemRowAdapter adapter, int pos, final Activity activity, final boolean noHistory) {
-        final TvApp application = TvApp.getApplication();
-        MediaManager.setCurrentMediaAdapter(adapter);
+        KoinJavaComponent.<MediaManager>get(MediaManager.class).setCurrentMediaAdapter(adapter);
 
         switch (rowItem.getItemType()) {
 
@@ -144,14 +138,14 @@ public class ItemLauncher {
 
                     case Audio:
                         //produce item menu
-                        KeyProcessor.HandleKey(KeyEvent.KEYCODE_MENU, rowItem, (BaseActivity) activity);
+                        KeyProcessor.HandleKey(KeyEvent.KEYCODE_MENU, rowItem, activity);
                         return;
 
                     case Season:
                     case RecordingGroup:
                         //Start activity for enhanced browse
                         Intent seasonIntent = new Intent(activity, GenericFolderActivity.class);
-                        seasonIntent.putExtra(Extras.Folder, get(GsonJsonSerializer.class).SerializeToString(baseItem));
+                        seasonIntent.putExtra(Extras.Folder, KoinJavaComponent.<GsonJsonSerializer>get(GsonJsonSerializer.class).SerializeToString(baseItem));
                         if (noHistory) {
                             seasonIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
                         }
@@ -163,7 +157,7 @@ public class ItemLauncher {
                     case BoxSet:
                         // open collection browsing
                         Intent collectionIntent = new Intent(activity, CollectionActivity.class);
-                        collectionIntent.putExtra(Extras.Folder, get(GsonJsonSerializer.class).SerializeToString(baseItem));
+                        collectionIntent.putExtra(Extras.Folder, KoinJavaComponent.<GsonJsonSerializer>get(GsonJsonSerializer.class).SerializeToString(baseItem));
                         if (noHistory) {
                             collectionIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
                         }
@@ -173,7 +167,7 @@ public class ItemLauncher {
 
                     case Photo:
                         // open photo player
-                        MediaManager.setCurrentMediaPosition(pos);
+                        KoinJavaComponent.<MediaManager>get(MediaManager.class).setCurrentMediaPosition(pos);
                         Intent photoIntent = new Intent(activity, PhotoPlayerActivity.class);
 
                         activity.startActivity(photoIntent);
@@ -183,20 +177,20 @@ public class ItemLauncher {
 
                 // or generic handling
                 if (baseItem.getIsFolderItem()) {
-                    // open generic folder browsing - but need display prefs
-                    TvApp.getApplication().getDisplayPrefsAsync(baseItem.getDisplayPreferencesId(), new Response<DisplayPreferences>() {
-                        @Override
-                        public void onResponse(DisplayPreferences response) {
-                            Intent intent = new Intent(activity, GenericGridActivity.class);
-                            intent.putExtra(Extras.Folder, get(GsonJsonSerializer.class).SerializeToString(baseItem));
-                            if (noHistory) {
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-                            }
+                    // Some items don't have a display preferences id, but it's required for StdGridFragment
+                    // Use the id of the item as a workaround, it's a unique key for the specific item
+                    // Which is exactly what we want
+                    if (baseItem.getDisplayPreferencesId() == null) {
+                        baseItem.setDisplayPreferencesId(baseItem.getId());
+                    }
 
-                            activity.startActivity(intent);
+                    Intent intent = new Intent(activity, GenericGridActivity.class);
+                    intent.putExtra(Extras.Folder, KoinJavaComponent.<GsonJsonSerializer>get(GsonJsonSerializer.class).SerializeToString(baseItem));
+                    if (noHistory) {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+                    }
 
-                        }
-                    });
+                    activity.startActivity(intent);
                 } else {
                     switch (rowItem.getSelectAction()) {
 
@@ -217,8 +211,9 @@ public class ItemLauncher {
                                 PlaybackHelper.getItemsToPlay(baseItem, baseItem.getBaseItemType() == BaseItemType.Movie, false, new Response<List<BaseItemDto>>() {
                                     @Override
                                     public void onResponse(List<BaseItemDto> response) {
-                                        Intent intent = new Intent(activity, application.getPlaybackActivityClass(baseItem.getBaseItemType()));
-                                        MediaManager.setCurrentVideoQueue(response);
+                                        Class newActivity = KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class).getPlaybackActivityClass(baseItem.getBaseItemType());
+                                        Intent intent = new Intent(activity, newActivity);
+                                        KoinJavaComponent.<MediaManager>get(MediaManager.class).setCurrentVideoQueue(response);
                                         intent.putExtra("Position", 0);
                                         activity.startActivity(intent);
                                     }
@@ -244,13 +239,14 @@ public class ItemLauncher {
             case Chapter:
                 final ChapterItemInfo chapter = rowItem.getChapterInfo();
                 //Start playback of the item at the chapter point
-                get(ApiClient.class).GetItemAsync(chapter.getItemId(), application.getCurrentUser().getId(), new Response<BaseItemDto>() {
+                KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemAsync(chapter.getItemId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
                     @Override
                     public void onResponse(BaseItemDto response) {
                         List<BaseItemDto> items = new ArrayList<>();
                         items.add(response);
-                        MediaManager.setCurrentVideoQueue(items);
-                        Intent intent = new Intent(activity, application.getPlaybackActivityClass(response.getBaseItemType()));
+                        KoinJavaComponent.<MediaManager>get(MediaManager.class).setCurrentVideoQueue(items);
+                        Class newActivity = KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class).getPlaybackActivityClass(response.getBaseItemType());
+                        Intent intent = new Intent(activity, newActivity);
                         Long start = chapter.getStartPositionTicks() / 10000;
                         intent.putExtra("Position", start.intValue());
                         activity.startActivity(intent);
@@ -258,32 +254,17 @@ public class ItemLauncher {
                 });
 
                 break;
-            case Server:
-                //Log in to selected server
-                get(ApiClient.class).ChangeServerLocation(rowItem.getServerInfo().getAddress());
-                AuthenticationHelper.enterManualUser(activity);
-                break;
-
-            case User:
-                final UserDto user = rowItem.getUser();
-                if (user.getHasPassword()) {
-                    Utils.processPasswordEntry(activity, user);
-
-                } else {
-                    AuthenticationHelper.loginUser(user.getName(), "", get(ApiClient.class), activity);
-                }
-                break;
 
             case SearchHint:
                 final SearchHint hint = rowItem.getSearchHint();
                 //Retrieve full item for display and playback
-                get(ApiClient.class).GetItemAsync(hint.getItemId(), application.getCurrentUser().getId(), new Response<BaseItemDto>() {
+                KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemAsync(hint.getItemId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
                     @Override
                     public void onResponse(BaseItemDto response) {
                         if (response.getIsFolderItem() && response.getBaseItemType() != BaseItemType.Series) {
                             // open generic folder browsing
                             Intent intent = new Intent(activity, GenericGridActivity.class);
-                            intent.putExtra(Extras.Folder, get(GsonJsonSerializer.class).SerializeToString(response));
+                            intent.putExtra(Extras.Folder, KoinJavaComponent.<GsonJsonSerializer>get(GsonJsonSerializer.class).SerializeToString(response));
 
                             activity.startActivity(intent);
 
@@ -321,13 +302,14 @@ public class ItemLauncher {
                     case Play:
                         if (program.getPlayAccess() == PlayAccess.Full) {
                             //Just play it directly - need to retrieve program channel via items api to convert to BaseItem
-                            get(ApiClient.class).GetItemAsync(program.getChannelId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
+                            KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemAsync(program.getChannelId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
                                 @Override
                                 public void onResponse(BaseItemDto response) {
                                     List<BaseItemDto> items = new ArrayList<>();
                                     items.add(response);
-                                    Intent intent = new Intent(activity, TvApp.getApplication().getPlaybackActivityClass(response.getBaseItemType()));
-                                    MediaManager.setCurrentVideoQueue(items);
+                                    Class newActivity = KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class).getPlaybackActivityClass(response.getBaseItemType());
+                                    Intent intent = new Intent(activity, newActivity);
+                                    KoinJavaComponent.<MediaManager>get(MediaManager.class).setCurrentVideoQueue(items);
                                     intent.putExtra("Position", 0);
                                     activity.startActivity(intent);
 
@@ -342,15 +324,16 @@ public class ItemLauncher {
             case LiveTvChannel:
                 //Just tune to it by playing
                 final ChannelInfoDto channel = rowItem.getChannelInfo();
-                get(ApiClient.class).GetItemAsync(channel.getId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
+                KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemAsync(channel.getId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
                     @Override
                     public void onResponse(BaseItemDto response) {
                         PlaybackHelper.getItemsToPlay(response, false, false, new Response<List<BaseItemDto>>() {
                             @Override
                             public void onResponse(List<BaseItemDto> response) {
                                 // TODO Check whether this usage of BaseItemType.valueOf is okay.
-                                Intent intent = new Intent(activity, application.getPlaybackActivityClass(BaseItemType.valueOf(channel.getType())));
-                                MediaManager.setCurrentVideoQueue(response);
+                                Class newActivity = KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class).getPlaybackActivityClass(BaseItemType.valueOf(channel.getType()));
+                                Intent intent = new Intent(activity, newActivity);
+                                KoinJavaComponent.<MediaManager>get(MediaManager.class).setCurrentVideoQueue(response);
                                 intent.putExtra("Position", 0);
                                 activity.startActivity(intent);
 
@@ -373,13 +356,14 @@ public class ItemLauncher {
                     case Play:
                         if (rowItem.getRecordingInfo().getPlayAccess() == PlayAccess.Full) {
                             //Just play it directly but need to retrieve as base item
-                            get(ApiClient.class).GetItemAsync(rowItem.getRecordingInfo().getId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
+                            KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemAsync(rowItem.getRecordingInfo().getId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
                                 @Override
                                 public void onResponse(BaseItemDto response) {
-                                    Intent intent = new Intent(activity, application.getPlaybackActivityClass(rowItem.getBaseItemType()));
+                                    Class newActivity = KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class).getPlaybackActivityClass(rowItem.getBaseItemType());
+                                    Intent intent = new Intent(activity, newActivity);
                                     List<BaseItemDto> items = new ArrayList<>();
                                     items.add(response);
-                                    MediaManager.setCurrentVideoQueue(items);
+                                    KoinJavaComponent.<MediaManager>get(MediaManager.class).setCurrentVideoQueue(items);
                                     intent.putExtra("Position", 0);
                                     activity.startActivity(intent);
                                 }
@@ -411,8 +395,8 @@ public class ItemLauncher {
                         Intent recordings = new Intent(activity, BrowseRecordingsActivity.class);
                         BaseItemDto folder = new BaseItemDto();
                         folder.setId("");
-                        folder.setName(TvApp.getApplication().getResources().getString(R.string.lbl_recorded_tv));
-                        recordings.putExtra(Extras.Folder, get(GsonJsonSerializer.class).SerializeToString(folder));
+                        folder.setName(activity.getString(R.string.lbl_recorded_tv));
+                        recordings.putExtra(Extras.Folder, KoinJavaComponent.<GsonJsonSerializer>get(GsonJsonSerializer.class).SerializeToString(folder));
                         activity.startActivity(recordings);
                         break;
 
@@ -420,7 +404,7 @@ public class ItemLauncher {
                         Intent queueIntent = new Intent(activity, ItemListActivity.class);
                         queueIntent.putExtra("ItemId", ItemListActivity.VIDEO_QUEUE);
                         //Resume first item if needed
-                        List<BaseItemDto> items = MediaManager.getCurrentVideoQueue();
+                        List<BaseItemDto> items = KoinJavaComponent.<MediaManager>get(MediaManager.class).getCurrentVideoQueue();
                         if (items != null) {
                             BaseItemDto first = items.size() > 0 ? items.get(0) : null;
                             if (first != null && first.getUserData() != null) {
@@ -439,7 +423,7 @@ public class ItemLauncher {
                         seriesTimers.setId("SERIESTIMERS");
                         seriesTimers.setCollectionType("SeriesTimers");
                         seriesTimers.setName(activity.getString(R.string.lbl_series_recordings));
-                        seriesIntent.putExtra(Extras.Folder, get(GsonJsonSerializer.class).SerializeToString(seriesTimers));
+                        seriesIntent.putExtra(Extras.Folder, KoinJavaComponent.<GsonJsonSerializer>get(GsonJsonSerializer.class).SerializeToString(seriesTimers));
 
                         activity.startActivity(seriesIntent);
                         break;

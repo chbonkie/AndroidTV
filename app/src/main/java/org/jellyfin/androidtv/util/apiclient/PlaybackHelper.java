@@ -5,10 +5,11 @@ import android.content.Context;
 import android.content.Intent;
 
 import org.jellyfin.androidtv.R;
-import org.jellyfin.androidtv.TvApp;
+import org.jellyfin.androidtv.auth.SessionRepository;
 import org.jellyfin.androidtv.preference.UserPreferences;
 import org.jellyfin.androidtv.ui.itemdetail.ItemListActivity;
 import org.jellyfin.androidtv.ui.playback.MediaManager;
+import org.jellyfin.androidtv.ui.playback.PlaybackLauncher;
 import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.apiclient.interaction.ApiClient;
 import org.jellyfin.apiclient.interaction.Response;
@@ -16,40 +17,45 @@ import org.jellyfin.apiclient.model.dto.BaseItemDto;
 import org.jellyfin.apiclient.model.dto.BaseItemType;
 import org.jellyfin.apiclient.model.entities.LocationType;
 import org.jellyfin.apiclient.model.livetv.ChannelInfoDto;
+import org.jellyfin.apiclient.model.querying.EpisodeQuery;
 import org.jellyfin.apiclient.model.querying.ItemFields;
 import org.jellyfin.apiclient.model.querying.ItemFilter;
 import org.jellyfin.apiclient.model.querying.ItemQuery;
 import org.jellyfin.apiclient.model.querying.ItemSortBy;
 import org.jellyfin.apiclient.model.querying.ItemsResult;
 import org.jellyfin.apiclient.model.querying.SimilarItemsQuery;
+import org.koin.java.KoinJavaComponent;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import timber.log.Timber;
 
-import static org.koin.java.KoinJavaComponent.get;
-
 public class PlaybackHelper {
+    private static final int ITEM_QUERY_LIMIT = 150; // limit the number of items retrieved for playback
+
     public static void getItemsToPlay(final BaseItemDto mainItem, boolean allowIntros, final boolean shuffle, final Response<List<BaseItemDto>> outerResponse) {
+        UUID userId = KoinJavaComponent.<SessionRepository>get(SessionRepository.class).getCurrentSession().getValue().getUserId();
+
         final List<BaseItemDto> items = new ArrayList<>();
         ItemQuery query = new ItemQuery();
 
         switch (mainItem.getBaseItemType()) {
             case Episode:
                 items.add(mainItem);
-                if (get(UserPreferences.class).get(UserPreferences.Companion.getMediaQueuingEnabled())) {
-                    MediaManager.setVideoQueueModified(false); // we are automatically creating new queue
+                if (KoinJavaComponent.<UserPreferences>get(UserPreferences.class).get(UserPreferences.Companion.getMediaQueuingEnabled())) {
+                    KoinJavaComponent.<MediaManager>get(MediaManager.class).setVideoQueueModified(false); // we are automatically creating new queue
                     //add subsequent episodes
-                    if (mainItem.getSeasonId() != null && mainItem.getIndexNumber() != null) {
-                        query.setParentId(mainItem.getSeasonId());
-                        query.setIsVirtualUnaired(false);
-                        query.setMinIndexNumber(mainItem.getIndexNumber() + 1);
-                        query.setSortBy(new String[] {ItemSortBy.SortName});
-                        query.setIncludeItemTypes(new String[]{"Episode"});
-                        query.setFields(new ItemFields[] {
+                    if (mainItem.getSeriesId() != null && mainItem.getId() != null) {
+                        EpisodeQuery episodeQuery = new EpisodeQuery();
+                        episodeQuery.setSeriesId(mainItem.getSeriesId());
+                        episodeQuery.setUserId(userId.toString());
+                        episodeQuery.setIsVirtualUnaired(false);
+                        episodeQuery.setIsMissing(false);
+                        episodeQuery.setFields(new ItemFields[] {
                                 ItemFields.MediaSources,
                                 ItemFields.MediaStreams,
                                 ItemFields.Path,
@@ -58,19 +64,25 @@ public class PlaybackHelper {
                                 ItemFields.PrimaryImageAspectRatio,
                                 ItemFields.ChildCount
                         });
-                        query.setUserId(TvApp.getApplication().getCurrentUser().getId());
-                        get(ApiClient.class).GetItemsAsync(query, new Response<ItemsResult>() {
+                        KoinJavaComponent.<ApiClient>get(ApiClient.class).GetEpisodesAsync(episodeQuery, new Response<ItemsResult>() {
                             @Override
                             public void onResponse(ItemsResult response) {
                                 if (response.getTotalRecordCount() > 0) {
+                                    // TODO: Finding the main item should be possible in the query using StartItemId, but it is not currently supported.
+                                    // With StartItemId added, the limit could also be included in the query.
+                                    boolean foundMainItem = false;
+                                    int numAdded = 0;
                                     for (BaseItemDto item : response.getItems()) {
-                                        if (item.getIndexNumber() > mainItem.getIndexNumber()) {
-                                            if (!LocationType.Virtual.equals(item.getLocationType())) {
+                                        if (foundMainItem) {
+                                            if (!LocationType.Virtual.equals(item.getLocationType()) && numAdded < ITEM_QUERY_LIMIT) {
                                                 items.add(item);
+                                                numAdded++;
                                             } else {
-                                                //stop adding when we hit a missing one
+                                                //stop adding when we hit a missing one or we have reached the limit
                                                 break;
                                             }
+                                        } else if (item.getId() != null && item.getId().equals(mainItem.getId())) {
+                                            foundMainItem = true;
                                         }
                                     }
                                 }
@@ -78,7 +90,7 @@ public class PlaybackHelper {
                             }
                         });
                     } else {
-                        Timber.i("Unable to add subsequent episodes due to lack of season or episode data.");
+                        Timber.i("Unable to add subsequent episodes due to lack of series or episode data.");
                         outerResponse.onResponse(items);
                     }
                 } else {
@@ -96,7 +108,7 @@ public class PlaybackHelper {
                 query.setIncludeItemTypes(new String[]{"Episode", "Movie", "Video"});
                 query.setSortBy(new String[]{shuffle ? ItemSortBy.Random : ItemSortBy.SortName});
                 query.setRecursive(true);
-                query.setLimit(50); // guard against too many items
+                query.setLimit(ITEM_QUERY_LIMIT);
                 query.setFields(new ItemFields[] {
                         ItemFields.MediaSources,
                         ItemFields.MediaStreams,
@@ -106,8 +118,8 @@ public class PlaybackHelper {
                         ItemFields.PrimaryImageAspectRatio,
                         ItemFields.ChildCount
                 });
-                query.setUserId(TvApp.getApplication().getCurrentUser().getId());
-                get(ApiClient.class).GetItemsAsync(query, new Response<ItemsResult>() {
+                query.setUserId(userId.toString());
+                KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemsAsync(query, new Response<ItemsResult>() {
                     @Override
                     public void onResponse(ItemsResult response) {
                         Collections.addAll(items, response.getItems());
@@ -121,22 +133,19 @@ public class PlaybackHelper {
                 query.setIsMissing(false);
                 query.setIsVirtualUnaired(false);
                 query.setMediaTypes(new String[]{"Audio"});
-                query.setSortBy(shuffle ? new String[] {ItemSortBy.Random} : mainItem.getBaseItemType() == BaseItemType.MusicArtist ? new String[] {ItemSortBy.Album} : new String[] {ItemSortBy.SortName});
+                query.setSortBy(mainItem.getBaseItemType() == BaseItemType.MusicArtist ?
+                        new String[] {ItemSortBy.Album,ItemSortBy.SortName} :
+                            new String[] {ItemSortBy.SortName});
                 query.setRecursive(true);
-                query.setLimit(150); // guard against too many items
+                query.setLimit(ITEM_QUERY_LIMIT);
                 query.setFields(new ItemFields[] {
                         ItemFields.PrimaryImageAspectRatio,
                         ItemFields.Genres,
                         ItemFields.ChildCount
                 });
-                query.setUserId(TvApp.getApplication().getCurrentUser().getId());
-
-                if (mainItem.getBaseItemType() == BaseItemType.MusicArtist)
-                    query.setArtistIds(new String[]{mainItem.getId()});
-                else
-                    query.setParentId(mainItem.getId());
-
-                get(ApiClient.class).GetItemsAsync(query, new Response<ItemsResult>() {
+                query.setUserId(userId.toString());
+                query.setArtistIds(new String[]{mainItem.getId()});
+                KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemsAsync(query, new Response<ItemsResult>() {
                     @Override
                     public void onResponse(ItemsResult response) {
                         outerResponse.onResponse(Arrays.asList(response.getItems()));
@@ -153,7 +162,7 @@ public class PlaybackHelper {
                 query.setIsVirtualUnaired(false);
                 if (shuffle) query.setSortBy(new String[] {ItemSortBy.Random});
                 query.setRecursive(true);
-                query.setLimit(150); // guard against too many items
+                query.setLimit(ITEM_QUERY_LIMIT);
                 query.setFields(new ItemFields[] {
                         ItemFields.MediaSources,
                         ItemFields.MediaStreams,
@@ -162,8 +171,8 @@ public class PlaybackHelper {
                         ItemFields.PrimaryImageAspectRatio,
                         ItemFields.ChildCount
                 });
-                query.setUserId(TvApp.getApplication().getCurrentUser().getId());
-                get(ApiClient.class).GetItemsAsync(query, new Response<ItemsResult>() {
+                query.setUserId(userId.toString());
+                KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemsAsync(query, new Response<ItemsResult>() {
                     @Override
                     public void onResponse(ItemsResult response) {
                         outerResponse.onResponse(Arrays.asList(response.getItems()));
@@ -178,7 +187,7 @@ public class PlaybackHelper {
                 }
 
                 //We retrieve the channel the program is on (which should be the program's parent)
-                get(ApiClient.class).GetItemAsync(mainItem.getParentId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
+                KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemAsync(mainItem.getParentId(), userId.toString(), new Response<BaseItemDto>() {
                     @Override
                     public void onResponse(BaseItemDto response) {
                         // fill in info about the specific program for display
@@ -199,7 +208,7 @@ public class PlaybackHelper {
 
             case TvChannel:
                 // Retrieve full channel info for display
-                get(ApiClient.class).GetLiveTvChannelAsync(mainItem.getId(), TvApp.getApplication().getCurrentUser().getId(), new Response<ChannelInfoDto>() {
+                KoinJavaComponent.<ApiClient>get(ApiClient.class).GetLiveTvChannelAsync(mainItem.getId(), userId.toString(), new Response<ChannelInfoDto>() {
                     @Override
                     public void onResponse(ChannelInfoDto response) {
                         // get current program info and fill it into our item
@@ -216,13 +225,17 @@ public class PlaybackHelper {
                 break;
 
             default:
-                if (allowIntros && !TvApp.getApplication().useExternalPlayer(mainItem.getBaseItemType()) && get(UserPreferences.class).get(UserPreferences.Companion.getCinemaModeEnabled())) {
+                if (allowIntros && !KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class).useExternalPlayer(mainItem.getBaseItemType()) && KoinJavaComponent.<UserPreferences>get(UserPreferences.class).get(UserPreferences.Companion.getCinemaModeEnabled())) {
                     //Intros
-                    get(ApiClient.class).GetIntrosAsync(mainItem.getId(), TvApp.getApplication().getCurrentUser().getId(), new Response<ItemsResult>() {
+                    KoinJavaComponent.<ApiClient>get(ApiClient.class).GetIntrosAsync(mainItem.getId(), userId.toString(), new Response<ItemsResult>() {
                         @Override
                         public void onResponse(ItemsResult response) {
                             if (response.getTotalRecordCount() > 0){
-                                Collections.addAll(items, response.getItems());
+
+                                for (BaseItemDto intro : response.getItems()) {
+                                    intro.setBaseItemType(BaseItemType.Trailer);
+                                    items.add(intro);
+                                }
                                 Timber.i("%d intro items added for playback.", response.getTotalRecordCount());
                             }
                             //Finally, the main item including subsequent parts
@@ -244,22 +257,26 @@ public class PlaybackHelper {
     }
 
     public static void play(final BaseItemDto item, final int pos, final boolean shuffle, final Context activity) {
+        PlaybackLauncher playbackLauncher = KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class);
+        if (playbackLauncher.interceptPlayRequest(activity, item)) return;
+
         getItemsToPlay(item, pos == 0 && item.getBaseItemType() == BaseItemType.Movie, shuffle, new Response<List<BaseItemDto>>() {
             @Override
             public void onResponse(List<BaseItemDto> response) {
                 switch (item.getBaseItemType()) {
                     case MusicAlbum:
                     case MusicArtist:
-                        MediaManager.playNow(response);
+                        KoinJavaComponent.<MediaManager>get(MediaManager.class).playNow(activity, response, shuffle);
                         break;
                     case Playlist:
                         if ("Audio".equals(item.getMediaType())) {
-                            MediaManager.playNow(response);
+                            KoinJavaComponent.<MediaManager>get(MediaManager.class).playNow(activity, response, shuffle);
 
                         } else {
                             BaseItemType itemType = response.size() > 0 ? response.get(0).getBaseItemType() : null;
-                            Intent intent = new Intent(activity, TvApp.getApplication().getPlaybackActivityClass(itemType));
-                            MediaManager.setCurrentVideoQueue(response);
+                            Class newActivity = playbackLauncher.getPlaybackActivityClass(itemType);
+                            Intent intent = new Intent(activity, newActivity);
+                            KoinJavaComponent.<MediaManager>get(MediaManager.class).setCurrentVideoQueue(response);
                             intent.putExtra("Position", pos);
                             if (!(activity instanceof Activity))
                                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -268,13 +285,14 @@ public class PlaybackHelper {
                         break;
                     case Audio:
                         if (response.size() > 0) {
-                            MediaManager.playNow(response.get(0));
+                            KoinJavaComponent.<MediaManager>get(MediaManager.class).playNow(activity, response.get(0));
                         }
                         break;
 
                     default:
-                        Intent intent = new Intent(activity, TvApp.getApplication().getPlaybackActivityClass(item.getBaseItemType()));
-                        MediaManager.setCurrentVideoQueue(response);
+                        Class newActivity = playbackLauncher.getPlaybackActivityClass(item.getBaseItemType());
+                        Intent intent = new Intent(activity, newActivity);
+                        KoinJavaComponent.<MediaManager>get(MediaManager.class).setCurrentVideoQueue(response);
                         intent.putExtra("Position", pos);
                         if (!(activity instanceof Activity))
                             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -290,7 +308,7 @@ public class PlaybackHelper {
 
     private static int getResumePreroll() {
         try {
-            return Integer.parseInt(get(UserPreferences.class).get(UserPreferences.Companion.getResumeSubtractDuration())) * 1000;
+            return Integer.parseInt(KoinJavaComponent.<UserPreferences>get(UserPreferences.class).get(UserPreferences.Companion.getResumeSubtractDuration())) * 1000;
         } catch (Exception e) {
             Timber.e(e, "Unable to parse resume preroll");
             return 0;
@@ -298,7 +316,8 @@ public class PlaybackHelper {
     }
 
     public static void retrieveAndPlay(String id, final boolean shuffle, final Long position, final Context activity) {
-        get(ApiClient.class).GetItemAsync(id, TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
+        UUID userId = KoinJavaComponent.<SessionRepository>get(SessionRepository.class).getCurrentSession().getValue().getUserId();
+        KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemAsync(id, userId.toString(), new Response<BaseItemDto>() {
             @Override
             public void onResponse(BaseItemDto response) {
                 Long pos = position != null ? position / 10000 : response.getUserData() != null ? (response.getUserData().getPlaybackPositionTicks() / 10000) - getResumePreroll() : 0;
@@ -313,29 +332,34 @@ public class PlaybackHelper {
         });
     }
 
-    public static void playInstantMix(String seedId) {
+    public static void playInstantMix(Context context, BaseItemDto item) {
+        PlaybackLauncher playbackLauncher = KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class);
+        if (playbackLauncher.interceptPlayRequest(context, item)) return;
+
+        String seedId = item.getId();
         getInstantMixAsync(seedId, new Response<BaseItemDto[]>() {
             @Override
             public void onResponse(BaseItemDto[] response) {
                 if (response.length > 0) {
-                    MediaManager.playNow(Arrays.asList(response));
+                    KoinJavaComponent.<MediaManager>get(MediaManager.class).playNow(context, Arrays.asList(response), false);
                 } else {
-                    Utils.showToast(TvApp.getApplication(), R.string.msg_no_playable_items);
+                    Utils.showToast(context, R.string.msg_no_playable_items);
                 }
             }
         });
     }
 
     public static void getInstantMixAsync(String seedId, final Response<BaseItemDto[]> outerResponse) {
+        UUID userId = KoinJavaComponent.<SessionRepository>get(SessionRepository.class).getCurrentSession().getValue().getUserId();
         SimilarItemsQuery query = new SimilarItemsQuery();
         query.setId(seedId);
-        query.setUserId(TvApp.getApplication().getCurrentUser().getId());
+        query.setUserId(userId.toString());
         query.setFields(new ItemFields[] {
                 ItemFields.PrimaryImageAspectRatio,
                 ItemFields.Genres,
                 ItemFields.ChildCount
         });
-        get(ApiClient.class).GetInstantMixFromItem(query, new Response<ItemsResult>() {
+        KoinJavaComponent.<ApiClient>get(ApiClient.class).GetInstantMixFromItem(query, new Response<ItemsResult>() {
             @Override
             public void onResponse(ItemsResult response) {
                 outerResponse.onResponse(response.getItems());
@@ -352,7 +376,8 @@ public class PlaybackHelper {
         items.add(mainItem);
         if (mainItem.getPartCount() != null && mainItem.getPartCount() > 1) {
             // get additional parts
-            get(ApiClient.class).GetAdditionalParts(mainItem.getId(), TvApp.getApplication().getCurrentUser().getId(), new Response<ItemsResult>() {
+            UUID userId = KoinJavaComponent.<SessionRepository>get(SessionRepository.class).getCurrentSession().getValue().getUserId();
+            KoinJavaComponent.<ApiClient>get(ApiClient.class).GetAdditionalParts(mainItem.getId(), userId.toString(), new Response<ItemsResult>() {
                 @Override
                 public void onResponse(ItemsResult response) {
                     Collections.addAll(items, response.getItems());

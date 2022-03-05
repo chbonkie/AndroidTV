@@ -1,38 +1,22 @@
-/*
- * Copyright (C) 2014 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
- */
-
 package org.jellyfin.androidtv.ui.browsing;
 
-import android.app.Activity;
-import android.content.Context;
+import static org.koin.java.KoinJavaComponent.inject;
+
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.PopupWindow;
 
-import androidx.leanback.app.BackgroundManager;
 import androidx.leanback.widget.OnItemViewClickedListener;
 import androidx.leanback.widget.OnItemViewSelectedListener;
 import androidx.leanback.widget.Presenter;
@@ -41,106 +25,95 @@ import androidx.leanback.widget.RowPresenter;
 import androidx.leanback.widget.VerticalGridPresenter;
 
 import org.jellyfin.androidtv.R;
-import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.constant.CustomMessage;
 import org.jellyfin.androidtv.constant.Extras;
+import org.jellyfin.androidtv.constant.GridDirection;
 import org.jellyfin.androidtv.constant.ImageType;
 import org.jellyfin.androidtv.constant.PosterSize;
 import org.jellyfin.androidtv.constant.QueryType;
 import org.jellyfin.androidtv.data.model.FilterOptions;
 import org.jellyfin.androidtv.data.querying.ViewQuery;
-import org.jellyfin.androidtv.preference.UserPreferences;
-import org.jellyfin.androidtv.preference.constant.GridDirection;
-import org.jellyfin.androidtv.ui.CharSelectedListener;
-import org.jellyfin.androidtv.ui.DisplayPrefsPopup;
+import org.jellyfin.androidtv.data.repository.UserViewsRepository;
+import org.jellyfin.androidtv.data.service.BackgroundService;
+import org.jellyfin.androidtv.databinding.PopupEmptyBinding;
+import org.jellyfin.androidtv.preference.LibraryPreferences;
+import org.jellyfin.androidtv.preference.PreferencesRepository;
+import org.jellyfin.androidtv.ui.AlphaPicker;
 import org.jellyfin.androidtv.ui.GridFragment;
-import org.jellyfin.androidtv.ui.ImageButton;
-import org.jellyfin.androidtv.ui.JumpList;
-import org.jellyfin.androidtv.ui.shared.BaseActivity;
-import org.jellyfin.androidtv.ui.shared.IKeyListener;
-import org.jellyfin.androidtv.ui.shared.IMessageListener;
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher;
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
 import org.jellyfin.androidtv.ui.playback.MediaManager;
+import org.jellyfin.androidtv.ui.preference.PreferencesActivity;
 import org.jellyfin.androidtv.ui.presentation.CardPresenter;
 import org.jellyfin.androidtv.ui.presentation.HorizontalGridPresenter;
-import org.jellyfin.androidtv.ui.search.SearchActivity;
-import org.jellyfin.androidtv.util.BackgroundManagerExtensionsKt;
+import org.jellyfin.androidtv.ui.shared.BaseActivity;
+import org.jellyfin.androidtv.ui.shared.KeyListener;
+import org.jellyfin.androidtv.ui.shared.MessageListener;
 import org.jellyfin.androidtv.util.KeyProcessor;
 import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.apiclient.interaction.EmptyResponse;
-import org.jellyfin.apiclient.interaction.Response;
-import org.jellyfin.apiclient.model.dto.BaseItemDto;
 import org.jellyfin.apiclient.model.dto.BaseItemType;
-import org.jellyfin.apiclient.model.entities.DisplayPreferences;
-import org.jellyfin.apiclient.serialization.GsonJsonSerializer;
+import org.jellyfin.apiclient.model.entities.CollectionType;
+import org.jellyfin.sdk.model.api.BaseItemDto;
 
-import java.util.HashMap;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.UUID;
 
+import kotlin.Lazy;
+import kotlinx.serialization.json.Json;
 import timber.log.Timber;
 
-import static org.koin.java.KoinJavaComponent.get;
-
-public class StdGridFragment extends GridFragment implements IGridLoader {
-    private static final String TAG = "StdGridFragment";
-
-    private static final int BACKGROUND_UPDATE_DELAY = 100;
-
+public class StdGridFragment extends GridFragment {
     protected String MainTitle;
-    protected TvApp mApplication;
     protected BaseActivity mActivity;
     protected BaseRowItem mCurrentItem;
     protected CompositeClickedListener mClickedListener = new CompositeClickedListener();
     protected CompositeSelectedListener mSelectedListener = new CompositeSelectedListener();
     protected ItemRowAdapter mGridAdapter;
-    private DisplayMetrics mMetrics;
-    private Timer mBackgroundTimer;
     private final Handler mHandler = new Handler();
-    private String mBackgroundUrl;
     protected BrowseRowDef mRowDef;
     CardPresenter mCardPresenter;
 
     protected boolean justLoaded = true;
-    protected boolean ShowFanart = false;
-    protected String mPosterSizeSetting = PosterSize.AUTO;
-    protected String mImageType = ImageType.DEFAULT;
+    protected PosterSize mPosterSizeSetting = PosterSize.AUTO;
+    protected ImageType mImageType = ImageType.DEFAULT;
+    protected GridDirection mGridDirection = GridDirection.HORIZONTAL;
     protected boolean determiningPosterSize = false;
 
-    protected String mParentId;
+    protected UUID mParentId;
     protected BaseItemDto mFolder;
-    protected DisplayPreferences mDisplayPrefs;
+    protected LibraryPreferences libraryPreferences;
 
     private int mCardHeight = SMALL_CARD;
 
-    protected boolean mAllowViewSelection = true;
+    private Lazy<BackgroundService> backgroundService = inject(BackgroundService.class);
+    private Lazy<MediaManager> mediaManager = inject(MediaManager.class);
+    private Lazy<PreferencesRepository> preferencesRepository = inject(PreferencesRepository.class);
+    private Lazy<UserViewsRepository> userViewsRepository = inject(UserViewsRepository.class);
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        mApplication = TvApp.getApplication();
-        mFolder = get(GsonJsonSerializer.class).DeserializeFromString(getActivity().getIntent().getStringExtra(Extras.Folder), BaseItemDto.class);
+        mFolder = Json.Default.decodeFromString(BaseItemDto.Companion.serializer(), requireActivity().getIntent().getStringExtra(Extras.Folder));
         mParentId = mFolder.getId();
         MainTitle = mFolder.getName();
-        mDisplayPrefs = TvApp.getApplication().getCachedDisplayPrefs(mFolder.getDisplayPreferencesId()); //These should have already been loaded
-        mPosterSizeSetting = mDisplayPrefs.getCustomPrefs().get("PosterSize");
-        mImageType = mDisplayPrefs.getCustomPrefs().get("ImageType");
-        if (mImageType == null) mImageType = ImageType.DEFAULT;
-        if (mPosterSizeSetting == null) mPosterSizeSetting = PosterSize.AUTO;
+        libraryPreferences = preferencesRepository.getValue().getLibraryPreferences(mFolder.getDisplayPreferencesId());
+        mPosterSizeSetting = libraryPreferences.get(LibraryPreferences.Companion.getPosterSize());
+        mImageType = libraryPreferences.get(LibraryPreferences.Companion.getImageType());
+        mGridDirection = libraryPreferences.get(LibraryPreferences.Companion.getGridDirection());
+
+        if (mGridDirection.equals(GridDirection.VERTICAL))
+            setGridPresenter(new VerticalGridPresenter());
+        else
+            setGridPresenter(new HorizontalGridPresenter());
 
         mCardHeight = getCardHeight(mPosterSizeSetting);
-
-        if (get(UserPreferences.class).get(UserPreferences.Companion.getGridDirection()) == GridDirection.HORIZONTAL)
-            setGridPresenter(new HorizontalGridPresenter());
-        else
-            setGridPresenter(new VerticalGridPresenter());
+        setCardHeight(mCardHeight);
 
         setGridSizes();
 
-        mJumplistPopup = new JumplistPopup(getActivity());
+        mJumplistPopup = new JumplistPopup();
     }
 
     private void setGridSizes() {
@@ -154,16 +127,38 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
             // is this bad? Yup it definitely is, we'll fix it when this screen is rewritten
 
             int size;
-            switch (mPosterSizeSetting) {
-                case PosterSize.SMALL:
-                    size = 10;
-                    break;
-                case PosterSize.MED:
+            switch (mImageType) {
+                case DEFAULT:
                 default:
-                    size = 6;
+                    if (mCardHeight == SMALL_VERTICAL_POSTER) {
+                        size = 10;
+                    } else if (mCardHeight == MED_VERTICAL_POSTER || mCardHeight == SMALL_VERTICAL_SQUARE) {
+                        size = 7;
+                    } else if (mCardHeight == LARGE_VERTICAL_POSTER) {
+                        size = 6;
+                    } else if (mCardHeight == MED_VERTICAL_SQUARE) {
+                        size = 5;
+                    } else {
+                        size = 4;
+                    }
                     break;
-                case PosterSize.LARGE:
-                    size = 5;
+                case THUMB:
+                    if (mCardHeight == SMALL_VERTICAL_THUMB) {
+                        size = 4;
+                    } else if (mCardHeight == MED_VERTICAL_THUMB) {
+                        size = 3;
+                    } else {
+                        size = 2;
+                    }
+                    break;
+                case BANNER:
+                    if (mCardHeight == SMALL_VERTICAL_BANNER) {
+                        size = 3;
+                    } else if (mCardHeight == MED_VERTICAL_BANNER) {
+                        size = 2;
+                    } else {
+                        size = 1;
+                    }
                     break;
             }
 
@@ -177,37 +172,46 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
 
         if (getActivity() instanceof BaseActivity) mActivity = (BaseActivity)getActivity();
 
-        prepareBackgroundManager();
+        backgroundService.getValue().attach(requireActivity());
 
-        setupQueries(this);
+        setupQueries();
 
         addTools();
 
         setupEventListeners();
     }
 
-    protected void setupQueries(IGridLoader gridLoader) {
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (null != mBackgroundTimer) {
-            mBackgroundTimer.cancel();
-        }
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-
+    protected void setupQueries() {
     }
 
     @Override
     public void onResume() {
         super.onResume();
 
-        ShowFanart = get(UserPreferences.class).get(UserPreferences.Companion.getBackdropEnabled());
+        PosterSize posterSizeSetting = libraryPreferences.get(LibraryPreferences.Companion.getPosterSize());
+        ImageType imageType = libraryPreferences.get(LibraryPreferences.Companion.getImageType());
+        GridDirection gridDirection = libraryPreferences.get(LibraryPreferences.Companion.getGridDirection());
+
+        if (mImageType != imageType || mPosterSizeSetting != posterSizeSetting || mGridDirection != gridDirection) {
+            mImageType = imageType;
+            mPosterSizeSetting = posterSizeSetting;
+            mGridDirection = gridDirection;
+
+            if (mGridDirection.equals(GridDirection.VERTICAL) && (getGridPresenter() == null || !(getGridPresenter() instanceof VerticalGridPresenter)))
+                setGridPresenter(new VerticalGridPresenter());
+            else if (mGridDirection.equals(GridDirection.HORIZONTAL) && (getGridPresenter() == null || !(getGridPresenter() instanceof HorizontalGridPresenter)))
+                setGridPresenter(new HorizontalGridPresenter());
+
+            int cardHeight = getCardHeight(mPosterSizeSetting);
+            if (mCardHeight != cardHeight) {
+                mCardHeight = cardHeight;
+                setCardHeight(mCardHeight);
+            }
+
+            setGridSizes();
+            createGrid();
+            loadGrid(mRowDef);
+        }
 
         if (!justLoaded) {
             //Re-retrieve anything that needs it but delay slightly so we don't take away gui landing
@@ -215,7 +219,7 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
                 new Handler().postDelayed(new Runnable() {
                     @Override
                     public void run() {
-                        if (mActivity.isFinishing()) return;
+                        if (mActivity == null || mActivity.isFinishing()) return;
                         if (mGridAdapter != null && mGridAdapter.size() > 0) {
                             if (!mGridAdapter.ReRetrieveIfNeeded()) refreshCurrentItem();
                         }
@@ -226,10 +230,6 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
         } else {
             justLoaded = false;
         }
-    }
-
-    public void setCardHeight(int height) {
-        mCardHeight = height;
     }
 
     public int getCardHeight() {
@@ -282,14 +282,12 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
         }
 
         FilterOptions filters = new FilterOptions();
-        filters.setFavoriteOnly(Boolean.parseBoolean(mDisplayPrefs.getCustomPrefs().get("FavoriteOnly")));
-        filters.setUnwatchedOnly(Boolean.parseBoolean(mDisplayPrefs.getCustomPrefs().get("UnwatchedOnly")));
+        filters.setFavoriteOnly(libraryPreferences.get(LibraryPreferences.Companion.getFilterFavoritesOnly()));
+        filters.setUnwatchedOnly(libraryPreferences.get(LibraryPreferences.Companion.getFilterUnwatchedOnly()));
 
         setupRetrieveListeners();
         mGridAdapter.setFilters(filters);
         setAdapter(mGridAdapter);
-
-
     }
 
     public void loadGrid(final BrowseRowDef rowDef) {
@@ -297,112 +295,80 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
         buildAdapter(rowDef);
 
         if (mPosterSizeSetting.equals(PosterSize.AUTO)) {
-            mGridAdapter.GetResultSizeAsync(new Response<Integer>() {
-                @Override
-                public void onResponse(Integer response) {
-                    int autoHeight = getAutoCardHeight(response);
-                    if (autoHeight != mCardHeight) {
-                        mCardHeight = autoHeight;
+            // Use "medium" cards by default
+            int autoHeight = getCardHeight(PosterSize.MED);
+            if (autoHeight != mCardHeight) {
+                mCardHeight = autoHeight;
+                setCardHeight(mCardHeight);
 
-                        setGridSizes();
-                        createGrid();
-                        Timber.d("Auto card height is %d", mCardHeight);
-                        buildAdapter(rowDef);
-                    }
-                    mGridAdapter.setSortBy(getSortOption(mDisplayPrefs.getSortBy()));
-                    mGridAdapter.Retrieve();
-                    determiningPosterSize = false;
-                }
-            });
+                setGridSizes();
+                createGrid();
+                Timber.d("Auto card height is %d", mCardHeight);
+                buildAdapter(rowDef);
+            }
+        }
+
+        mGridAdapter.setSortBy(getSortOption(libraryPreferences.get(LibraryPreferences.Companion.getSortBy())));
+        mGridAdapter.Retrieve();
+        determiningPosterSize = false;
+    }
+
+    protected int getCardHeight(PosterSize heightSetting) {
+        if (getGridPresenter() instanceof VerticalGridPresenter) {
+            boolean isSquareCard = mFolder.getCollectionType().equals(CollectionType.Music);
+            switch (heightSetting) {
+                case MED:
+                    return mImageType.equals(ImageType.BANNER) ? MED_VERTICAL_BANNER : mImageType.equals(ImageType.THUMB) ? MED_VERTICAL_THUMB : (isSquareCard) ? MED_VERTICAL_SQUARE : MED_VERTICAL_POSTER;
+                case LARGE:
+                    return mImageType.equals(ImageType.BANNER) ? LARGE_VERTICAL_BANNER : mImageType.equals(ImageType.THUMB) ? LARGE_VERTICAL_THUMB : (isSquareCard) ? LARGE_VERTICAL_SQUARE : LARGE_VERTICAL_POSTER;
+                default:
+                    return mImageType.equals(ImageType.BANNER) ? SMALL_VERTICAL_BANNER : mImageType.equals(ImageType.THUMB) ? SMALL_VERTICAL_THUMB : (isSquareCard) ? SMALL_VERTICAL_SQUARE : SMALL_VERTICAL_POSTER;
+            }
         } else {
-            mGridAdapter.setSortBy(getSortOption(mDisplayPrefs.getSortBy()));
-            mGridAdapter.Retrieve();
-            determiningPosterSize = false;
+            switch (heightSetting) {
+                case MED:
+                    return mImageType.equals(ImageType.BANNER) ? MED_BANNER : MED_CARD;
+                case LARGE:
+                    return mImageType.equals(ImageType.BANNER) ? LARGE_BANNER : LARGE_CARD;
+                default:
+                    return mImageType.equals(ImageType.BANNER) ? SMALL_BANNER : SMALL_CARD;
+            }
         }
-
-    }
-
-    protected int getCardHeight(String heightSetting) {
-        switch (heightSetting) {
-            case PosterSize.MED:
-                return mImageType.equals(ImageType.BANNER) ? MED_BANNER : MED_CARD;
-            case PosterSize.LARGE:
-                return mImageType.equals(ImageType.BANNER) ? LARGE_BANNER : LARGE_CARD;
-            default:
-                return mImageType.equals(ImageType.BANNER) ? SMALL_BANNER : SMALL_CARD;
-
-        }
-    }
-
-    protected int getAutoCardHeight(Integer size) {
-        Timber.d("Result size for auto card height is %d", size);
-        if (size > 35)
-            return getCardHeight(PosterSize.SMALL);
-        else if (size > 10)
-            return getCardHeight(PosterSize.MED);
-        else
-            return getCardHeight(PosterSize.LARGE);
-
-    }
-    private void prepareBackgroundManager() {
-
-        final BackgroundManager backgroundManager = BackgroundManager.getInstance(getActivity());
-        backgroundManager.attach(getActivity().getWindow());
-
-        mMetrics = new DisplayMetrics();
-        getActivity().getWindowManager().getDefaultDisplay().getMetrics(mMetrics);
     }
 
     protected ImageButton mSortButton;
-    protected ImageButton mSearchButton;
     protected ImageButton mSettingsButton;
     protected ImageButton mUnwatchedButton;
     protected ImageButton mFavoriteButton;
     protected ImageButton mLetterButton;
-    protected DisplayPrefsPopup mDisplayPrefsPopup;
 
     protected void updateDisplayPrefs() {
-        if (mDisplayPrefs.getCustomPrefs() == null)
-            mDisplayPrefs.setCustomPrefs(new HashMap<String, String>());
-        mDisplayPrefs.getCustomPrefs().put("UnwatchedOnly", mGridAdapter.getFilters().isUnwatchedOnly() ? "true" : "false");
-        mDisplayPrefs.getCustomPrefs().put("FavoriteOnly", mGridAdapter.getFilters().isFavoriteOnly() ? "true" : "false");
-        mDisplayPrefs.setSortBy(mGridAdapter.getSortBy());
-        mDisplayPrefs.setSortOrder(getSortOption(mGridAdapter.getSortBy()).order);
-        TvApp.getApplication().updateDisplayPrefs(mDisplayPrefs);
+        libraryPreferences.set(LibraryPreferences.Companion.getFilterFavoritesOnly(), mGridAdapter.getFilters().isFavoriteOnly());
+        libraryPreferences.set(LibraryPreferences.Companion.getFilterUnwatchedOnly(), mGridAdapter.getFilters().isUnwatchedOnly());
+        libraryPreferences.set(LibraryPreferences.Companion.getSortBy(), mGridAdapter.getSortBy());
+        libraryPreferences.set(LibraryPreferences.Companion.getSortOrder(), getSortOption(mGridAdapter.getSortBy()).order);
+        libraryPreferences.commitBlocking();
     }
 
     protected void addTools() {
         //Add tools
         LinearLayout toolBar = getToolBar();
-        int size = Utils.convertDpToPixel(getActivity(), 24);
+        int size = Utils.convertDpToPixel(requireContext(), 26);
 
-        mDisplayPrefsPopup = new DisplayPrefsPopup(getActivity(), mGridDock, mAllowViewSelection, new Response<Boolean>() {
-            @Override
-            public void onResponse(Boolean response) {
-                TvApp.getApplication().updateDisplayPrefs(mDisplayPrefs);
-                if (response)
-                {
-                    mImageType = mDisplayPrefs.getCustomPrefs().get("ImageType");
-                    mPosterSizeSetting = mDisplayPrefs.getCustomPrefs().get("PosterSize");
-                    mCardHeight = getCardHeight(mPosterSizeSetting);
-
-                    setGridSizes();
-                    createGrid();
-                    loadGrid(mRowDef);
-                }
-            }
-        });
-
-        mSortButton = new ImageButton(getActivity(), R.drawable.ic_sort, size, new View.OnClickListener() {
+        mSortButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
+        mSortButton.setImageResource(R.drawable.ic_sort);
+        mSortButton.setMaxHeight(size);
+        mSortButton.setAdjustViewBounds(true);
+        mSortButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 //Create sort menu
-                PopupMenu sortMenu = Utils.createPopupMenu(getActivity(), getToolBar(), Gravity.RIGHT);
+                PopupMenu sortMenu = new PopupMenu(getActivity(), getToolBar(), Gravity.END);
                 for (Integer key : sortOptions.keySet()) {
                     SortOption option = sortOptions.get(key);
                     if (option == null) option = sortOptions.get(0);
                     MenuItem item = sortMenu.getMenu().add(0, key, key, option.name);
-                    if (option.value.equals(mDisplayPrefs.getSortBy())) item.setChecked(true);
+                    if (option.value.equals(libraryPreferences.get(LibraryPreferences.Companion.getSortBy()))) item.setChecked(true);
                 }
                 sortMenu.getMenu().setGroupCheckable(0, true, true);
                 sortMenu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
@@ -423,7 +389,12 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
         toolBar.addView(mSortButton);
 
         if (mRowDef.getQueryType() == QueryType.Items) {
-            mUnwatchedButton = new ImageButton(getActivity(), mGridAdapter.getFilters().isUnwatchedOnly() ? R.drawable.ic_unwatch_red : R.drawable.ic_unwatch, size, new View.OnClickListener() {
+            mUnwatchedButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
+            mUnwatchedButton.setImageResource(R.drawable.ic_unwatch);
+            mUnwatchedButton.setActivated(mGridAdapter.getFilters().isUnwatchedOnly());
+            mUnwatchedButton.setMaxHeight(size);
+            mUnwatchedButton.setAdjustViewBounds(true);
+            mUnwatchedButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     FilterOptions filters = mGridAdapter.getFilters();
@@ -437,16 +408,19 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
                     } else {
                         mGridAdapter.Retrieve();
                     }
-                    mUnwatchedButton.setImageResource(filters.isUnwatchedOnly() ? R.drawable.ic_unwatch_red : R.drawable.ic_unwatch);
-
-
+                    mUnwatchedButton.setActivated(filters.isUnwatchedOnly());
                 }
             });
             mUnwatchedButton.setContentDescription(getString(R.string.lbl_unwatched));
             toolBar.addView(mUnwatchedButton);
         }
 
-        mFavoriteButton =new ImageButton(getActivity(), mGridAdapter.getFilters().isFavoriteOnly() ? R.drawable.ic_heart_red : R.drawable.ic_heart, size, new View.OnClickListener() {
+        mFavoriteButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
+        mFavoriteButton.setImageResource(R.drawable.ic_heart);
+        mFavoriteButton.setActivated(mGridAdapter.getFilters().isFavoriteOnly());
+        mFavoriteButton.setMaxHeight(size);
+        mFavoriteButton.setAdjustViewBounds(true);
+        mFavoriteButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 FilterOptions filters = mGridAdapter.getFilters();
@@ -460,14 +434,18 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
                 } else {
                     mGridAdapter.Retrieve();
                 }
-                mFavoriteButton.setImageResource(filters.isFavoriteOnly() ? R.drawable.ic_heart_red : R.drawable.ic_heart);
+                mFavoriteButton.setActivated(filters.isFavoriteOnly());
 
             }
         });
         mFavoriteButton.setContentDescription(getString(R.string.lbl_favorite));
         toolBar.addView(mFavoriteButton);
 
-        mLetterButton = new ImageButton(getActivity(), R.drawable.ic_jump_letter, size, new View.OnClickListener() {
+        mLetterButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
+        mLetterButton.setImageResource(R.drawable.ic_jump_letter);
+        mLetterButton.setMaxHeight(size);
+        mLetterButton.setAdjustViewBounds(true);
+        mLetterButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 //Open letter jump popup
@@ -477,79 +455,64 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
         mLetterButton.setContentDescription(getString(R.string.lbl_by_letter));
         toolBar.addView(mLetterButton);
 
-        mSearchButton = new ImageButton(getActivity(), R.drawable.ic_search, size, new View.OnClickListener() {
+        mSettingsButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
+        mSettingsButton.setImageResource(R.drawable.ic_settings);
+        mSettingsButton.setMaxHeight(size);
+        mSettingsButton.setAdjustViewBounds(true);
+        mSettingsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(getActivity(), SearchActivity.class);
-                intent.putExtra("MusicOnly", "music".equals(mFolder.getCollectionType()) || mFolder.getBaseItemType() == BaseItemType.MusicAlbum || mFolder.getBaseItemType() == BaseItemType.MusicArtist);
-
-                startActivity(intent);
-            }
-        });
-        mSearchButton.setContentDescription(getString(R.string.lbl_search));
-        toolBar.addView(mSearchButton);
-
-        mSettingsButton = new ImageButton(getActivity(), R.drawable.ic_settings, size, new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mDisplayPrefsPopup.show(mDisplayPrefs, mFolder.getCollectionType());
+                Intent settingsIntent = new Intent(getActivity(), PreferencesActivity.class);
+                settingsIntent.putExtra(PreferencesActivity.EXTRA_SCREEN, DisplayPreferencesScreen.class.getCanonicalName());
+                Bundle screenArgs = new Bundle();
+                screenArgs.putString(DisplayPreferencesScreen.ARG_PREFERENCES_ID, mFolder.getDisplayPreferencesId());
+                screenArgs.putBoolean(DisplayPreferencesScreen.ARG_ALLOW_VIEW_SELECTION, userViewsRepository.getValue().allowViewSelection(mFolder.getCollectionType()));
+                settingsIntent.putExtra(PreferencesActivity.EXTRA_SCREEN_ARGS, screenArgs);
+                getActivity().startActivity(settingsIntent);
             }
         });
         mSettingsButton.setContentDescription(getString(R.string.lbl_settings));
         toolBar.addView(mSettingsButton);
-
-
     }
 
     private JumplistPopup mJumplistPopup;
     class JumplistPopup {
 
-        final int WIDTH = Utils.convertDpToPixel(TvApp.getApplication(), 900);
-        final int HEIGHT = Utils.convertDpToPixel(TvApp.getApplication(), 55);
+        private final int WIDTH = Utils.convertDpToPixel(requireContext(), 900);
+        private final int HEIGHT = Utils.convertDpToPixel(requireContext(), 55);
 
-        PopupWindow mPopup;
-        Activity mActivity;
-        JumpList mJumplist;
+        private final PopupWindow popupWindow;
+        private final AlphaPicker alphaPicker;
 
-        JumplistPopup(Activity activity) {
-            mActivity = activity;
-            LayoutInflater inflater = (LayoutInflater) activity.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-            View layout = inflater.inflate(R.layout.empty_popup, null);
-            mPopup = new PopupWindow(layout, WIDTH, HEIGHT);
-            mPopup.setFocusable(true);
-            mPopup.setOutsideTouchable(true);
-            mPopup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT)); // necessary for popup to dismiss
-            mPopup.setAnimationStyle(R.style.PopupSlideInTop);
+        JumplistPopup() {
+            LayoutInflater inflater = LayoutInflater.from(requireContext());
+            PopupEmptyBinding layout = PopupEmptyBinding.inflate(inflater, mGridDock, false);
+            popupWindow = new PopupWindow(layout.emptyPopup, WIDTH, HEIGHT, true);
+            popupWindow.setOutsideTouchable(true);
+            popupWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT)); // necessary for popup to dismiss
+            popupWindow.setAnimationStyle(R.style.WindowAnimation_SlideTop);
 
-            mJumplist = new JumpList(activity, new CharSelectedListener() {
-                @Override
-                public void onCharSelected(String ch) {
-                    mGridAdapter.setStartLetter(ch);
-                    loadGrid(mRowDef);
-                    dismiss();
-                }
+            alphaPicker = new AlphaPicker(requireContext(), null);
+            alphaPicker.setOnAlphaSelected(letter -> {
+                mGridAdapter.setStartLetter(letter.toString());
+                loadGrid(mRowDef);
+                dismiss();
+                return null;
             });
 
-            mJumplist.setGravity(Gravity.CENTER_HORIZONTAL);
-            FrameLayout root = (FrameLayout) layout.findViewById(R.id.root);
-            root.addView(mJumplist);
-
-        }
-
-        public boolean isShowing() {
-            return (mPopup != null && mPopup.isShowing());
+            layout.emptyPopup.addView(alphaPicker);
         }
 
         public void show() {
-
-            mPopup.showAtLocation(mGridDock, Gravity.TOP, mGridDock.getLeft(), mGridDock.getTop());
-            mJumplist.setFocus(mGridAdapter.getStartLetter());
-
+            popupWindow.showAtLocation(mGridDock, Gravity.TOP, mGridDock.getLeft(), mGridDock.getTop());
+            if (mGridAdapter.getStartLetter() != null && !mGridAdapter.getStartLetter().isEmpty()) {
+                alphaPicker.focus(mGridAdapter.getStartLetter().charAt(0));
+            }
         }
 
         public void dismiss() {
-            if (mPopup != null && mPopup.isShowing()) {
-                mPopup.dismiss();
+            if (popupWindow != null && popupWindow.isShowing()) {
+                popupWindow.dismiss();
             }
         }
     }
@@ -563,19 +526,19 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
         mSelectedListener.registerListener(new ItemViewSelectedListener());
 
         if (mActivity != null) {
-            mActivity.registerKeyListener(new IKeyListener() {
+            mActivity.registerKeyListener(new KeyListener() {
                 @Override
                 public boolean onKeyUp(int key, KeyEvent event) {
                     if (key == KeyEvent.KEYCODE_MEDIA_PLAY || key == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
-                        MediaManager.setCurrentMediaAdapter(mGridAdapter);
-                        MediaManager.setCurrentMediaPosition(mCurrentItem.getIndex());
-                        MediaManager.setCurrentMediaTitle(mFolder.getName());
+                        mediaManager.getValue().setCurrentMediaAdapter(mGridAdapter);
+                        mediaManager.getValue().setCurrentMediaPosition(mCurrentItem.getIndex());
+                        mediaManager.getValue().setCurrentMediaTitle(mFolder.getName());
                     }
                     return KeyProcessor.HandleKey(key, mCurrentItem, mActivity);
                 }
             });
 
-            mActivity.registerMessageListener(new IMessageListener() {
+            mActivity.registerMessageListener(new MessageListener() {
                 @Override
                 public void onMessageReceived(CustomMessage message) {
                     switch (message) {
@@ -590,17 +553,9 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
     }
 
     protected void setupRetrieveListeners() {
-        mGridAdapter.setRetrieveStartedListener(new EmptyResponse() {
-            @Override
-            public void onResponse() {
-                showSpinner();
-
-            }
-        });
         mGridAdapter.setRetrieveFinishedListener(new EmptyResponse() {
             @Override
             public void onResponse() {
-                hideSpinner();
                 setStatusText(mFolder.getName());
                 updateCounter(mGridAdapter.getTotalItems() > 0 ? 1 : 0);
                 mLetterButton.setVisibility("SortName".equals(mGridAdapter.getSortBy()) ? View.VISIBLE : View.GONE);
@@ -620,19 +575,19 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
     }
 
     private void refreshCurrentItem() {
-        if (MediaManager.getCurrentMediaPosition() >= 0) {
-            mCurrentItem = MediaManager.getCurrentMediaItem();
+        if (mediaManager.getValue().getCurrentMediaPosition() >= 0) {
+            mCurrentItem = mediaManager.getValue().getCurrentMediaItem();
 
             Presenter presenter = getGridPresenter();
             if (presenter instanceof HorizontalGridPresenter)
-                ((HorizontalGridPresenter) presenter).setPosition(MediaManager.getCurrentMediaPosition());
+                ((HorizontalGridPresenter) presenter).setPosition(mediaManager.getValue().getCurrentMediaPosition());
             // Don't do anything for vertical grids as the presenter does not allow setting the position
 
-            MediaManager.setCurrentMediaPosition(-1); // re-set so it doesn't mess with parent views
+            mediaManager.getValue().setCurrentMediaPosition(-1); // re-set so it doesn't mess with parent views
         }
         if (mCurrentItem != null && mCurrentItem.getBaseItemType() != BaseItemType.Photo && mCurrentItem.getBaseItemType() != BaseItemType.PhotoAlbum
                 && mCurrentItem.getBaseItemType() != BaseItemType.MusicArtist && mCurrentItem.getBaseItemType() != BaseItemType.MusicAlbum) {
-            Timber.d("Refresh item \"%s\"", mCurrentItem.getFullName());
+            Timber.d("Refresh item \"%s\"", mCurrentItem.getFullName(requireContext()));
             mCurrentItem.refresh(new EmptyResponse() {
                 @Override
                 public void onResponse() {
@@ -650,7 +605,6 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
                     }
                 }
             });
-
         }
     }
 
@@ -667,10 +621,7 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
     private final Runnable mDelayedSetItem = new Runnable() {
         @Override
         public void run() {
-            if (ShowFanart) {
-                mBackgroundUrl = mCurrentItem.getBackdropImageUrl();
-                startBackgroundTimer();
-            }
+            backgroundService.getValue().setBackground(mCurrentItem.getBaseItem());
             setItem(mCurrentItem);
         }
     };
@@ -685,11 +636,10 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
                 mCurrentItem = null;
                 setTitle(MainTitle);
                 //fill in default background
-                mBackgroundUrl = null;
-                startBackgroundTimer();
+                backgroundService.getValue().clearBackgrounds();
             } else {
                 mCurrentItem = (BaseRowItem)item;
-                mTitleView.setText(mCurrentItem.getName());
+                mTitleView.setText(mCurrentItem.getName(requireContext()));
                 mInfoRow.removeAllViews();
                 mHandler.postDelayed(mDelayedSetItem, 400);
 
@@ -699,46 +649,4 @@ public class StdGridFragment extends GridFragment implements IGridLoader {
 
         }
     }
-
-    protected void updateBackground(String url) {
-        if (url == null) {
-            clearBackground();
-        } else {
-            BackgroundManagerExtensionsKt.drawable(
-                    BackgroundManager.getInstance(getActivity()),
-                    getActivity(),
-                    url,
-                    mMetrics.widthPixels,
-                    mMetrics.heightPixels
-            );
-        }
-    }
-
-    protected void clearBackground() {
-        BackgroundManager.getInstance(getActivity()).setDrawable(null);
-    }
-
-    private void startBackgroundTimer() {
-        if (null != mBackgroundTimer) {
-            mBackgroundTimer.cancel();
-        }
-        mBackgroundTimer = new Timer();
-        mBackgroundTimer.schedule(new UpdateBackgroundTask(), BACKGROUND_UPDATE_DELAY);
-    }
-
-    private class UpdateBackgroundTask extends TimerTask {
-
-        @Override
-        public void run() {
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    updateBackground(mBackgroundUrl);
-                }
-            });
-
-        }
-    }
-
-
 }

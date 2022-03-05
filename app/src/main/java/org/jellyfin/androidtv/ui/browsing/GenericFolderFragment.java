@@ -5,9 +5,6 @@ import android.os.Bundle;
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.data.querying.StdItemQuery;
-
-import java.util.Arrays;
-
 import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.apiclient.model.dto.BaseItemType;
 import org.jellyfin.apiclient.model.entities.SortOrder;
@@ -15,6 +12,8 @@ import org.jellyfin.apiclient.model.livetv.RecordingQuery;
 import org.jellyfin.apiclient.model.querying.ItemFields;
 import org.jellyfin.apiclient.model.querying.ItemFilter;
 import org.jellyfin.apiclient.model.querying.ItemSortBy;
+
+import java.util.Arrays;
 
 public class GenericFolderFragment extends EnhancedBrowseFragment {
 
@@ -27,7 +26,7 @@ public class GenericFolderFragment extends EnhancedBrowseFragment {
     private static BaseItemType[] showSpecialViewTypes = new BaseItemType[] {BaseItemType.CollectionFolder, BaseItemType.Folder, BaseItemType.UserView, BaseItemType.ChannelFolderItem };
 
     @Override
-    protected void setupQueries(IRowLoader rowLoader) {
+    protected void setupQueries(RowLoader rowLoader) {
 
         if (mFolder.getBaseItemType() == BaseItemType.RecordingGroup){
             RecordingQuery query = new RecordingQuery();
@@ -37,7 +36,7 @@ public class GenericFolderFragment extends EnhancedBrowseFragment {
                     ItemFields.PrimaryImageAspectRatio,
                     ItemFields.ChildCount
             });
-            mRows.add(new BrowseRowDef(mApplication.getResources().getString(R.string.lbl_all_items), query));
+            mRows.add(new BrowseRowDef(getString(R.string.lbl_all_items), query));
             rowLoader.loadRows(mRows);
         } else {
 
@@ -56,7 +55,7 @@ public class GenericFolderFragment extends EnhancedBrowseFragment {
                         resume.setFilters(new ItemFilter[]{ItemFilter.IsResumable});
                         resume.setSortBy(new String[]{ItemSortBy.DatePlayed});
                         resume.setSortOrder(SortOrder.Descending);
-                        mRows.add(new BrowseRowDef(mApplication.getString(R.string.lbl_continue_watching), resume, 0));
+                        mRows.add(new BrowseRowDef(getString(R.string.lbl_continue_watching), resume, 0));
                     }
 
                     StdItemQuery latest = new StdItemQuery();
@@ -65,14 +64,15 @@ public class GenericFolderFragment extends EnhancedBrowseFragment {
                     latest.setFilters(new ItemFilter[]{ItemFilter.IsUnplayed});
                     latest.setSortBy(new String[]{ItemSortBy.DateCreated});
                     latest.setSortOrder(SortOrder.Descending);
-                    mRows.add(new BrowseRowDef(mApplication.getString(R.string.lbl_latest_additions), latest, 0));
+                    mRows.add(new BrowseRowDef(getString(R.string.lbl_latest_additions), latest, 0));
 
                 }
 
 
                 StdItemQuery byName = new StdItemQuery();
                 byName.setParentId(mFolder.getId());
-                mRows.add(new BrowseRowDef(mApplication.getString(R.string.lbl_by_name), byName, 100));
+                String header = (mFolder.getBaseItemType() == BaseItemType.Season) ? mFolder.getName() : getString(R.string.lbl_by_name);
+                mRows.add(new BrowseRowDef(header, byName, 100));
 
                 rowLoader.loadRows(mRows);
 

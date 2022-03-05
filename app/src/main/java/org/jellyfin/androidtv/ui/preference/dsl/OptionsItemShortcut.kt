@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.annotation.StringRes
 import androidx.preference.PreferenceCategory
 import org.jellyfin.androidtv.ui.preference.custom.ButtonRemapPreference
-import java.util.*
+import java.util.UUID
 
 class OptionsItemShortcut(
 	private val context: Context
@@ -21,6 +21,7 @@ class OptionsItemShortcut(
 			it.isEnabled = dependencyCheckFun() && enabled
 			it.isVisible = visible
 			it.title = title
+			it.dialogTitle = title
 			it.summaryProvider = ButtonRemapPreference.ButtonRemapSummaryProvider.instance
 			it.keyCode = binder.get()
 			it.defaultKeyCode = binder.default()

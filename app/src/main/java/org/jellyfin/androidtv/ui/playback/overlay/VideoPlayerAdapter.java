@@ -5,7 +5,6 @@ import androidx.leanback.media.PlayerAdapter;
 import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.ui.playback.CustomPlaybackOverlayFragment;
 import org.jellyfin.androidtv.ui.playback.PlaybackController;
-import org.jellyfin.androidtv.util.DeviceUtils;
 import org.jellyfin.androidtv.util.apiclient.StreamHelper;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
 import org.jellyfin.apiclient.model.dto.ChapterInfoDto;
@@ -16,9 +15,11 @@ public class VideoPlayerAdapter extends PlayerAdapter {
 
     private final PlaybackController playbackController;
     private CustomPlaybackOverlayFragment customPlaybackOverlayFragment;
+    private LeanbackOverlayFragment leanbackOverlayFragment;
 
-    VideoPlayerAdapter(PlaybackController playbackController) {
+    VideoPlayerAdapter(PlaybackController playbackController, LeanbackOverlayFragment leanbackOverlayFragment) {
         this.playbackController = playbackController;
+        this.leanbackOverlayFragment = leanbackOverlayFragment;
     }
 
     @Override
@@ -56,7 +57,7 @@ public class VideoPlayerAdapter extends PlayerAdapter {
 
     @Override
     public long getDuration() {
-        return getCurrentlyPlayingItem().getRunTimeTicks() != null ?
+        return getCurrentlyPlayingItem() != null && getCurrentlyPlayingItem().getRunTimeTicks() != null ?
                 getCurrentlyPlayingItem().getRunTimeTicks() / 10000 : -1;
     }
 
@@ -72,11 +73,15 @@ public class VideoPlayerAdapter extends PlayerAdapter {
 
     @Override
     public long getBufferedPosition() {
-        return getDuration();
+        return playbackController.getBufferedPosition();
     }
 
     void updateCurrentPosition() {
         getCallback().onCurrentPositionChanged(this);
+
+        // only exoplayer supports reporting buffered position
+        if (isNativeMode())
+            getCallback().onBufferedPositionChanged(this);
     }
 
     void updatePlayState() {
@@ -104,7 +109,7 @@ public class VideoPlayerAdapter extends PlayerAdapter {
     }
 
     boolean canSeek() {
-        return !DeviceUtils.isFireTv() && playbackController.canSeek();
+        return playbackController.canSeek();
     }
 
     boolean isLiveTv() {
@@ -119,11 +124,20 @@ public class VideoPlayerAdapter extends PlayerAdapter {
         return customPlaybackOverlayFragment;
     }
 
+    LeanbackOverlayFragment getLeanbackOverlayFragment() {
+        return leanbackOverlayFragment;
+    }
+
+    @Override
+    public void onDetachedFromHost() {
+        customPlaybackOverlayFragment = null;
+        leanbackOverlayFragment = null;
+    }
+
     boolean canRecordLiveTv() {
         BaseItemDto currentlyPlayingItem = getCurrentlyPlayingItem();
-        TvApp application = TvApp.getApplication();
         return currentlyPlayingItem.getCurrentProgram() != null
-                && application.canManageRecordings();
+                && TvApp.getApplication().canManageRecordings();
     }
 
     void toggleRecording() {

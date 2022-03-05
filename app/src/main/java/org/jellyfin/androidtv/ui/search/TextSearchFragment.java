@@ -1,5 +1,7 @@
 package org.jellyfin.androidtv.ui.search;
 
+import static org.koin.java.KoinJavaComponent.inject;
+
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -11,33 +13,44 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.TextView;
 
-import org.jellyfin.androidtv.R;
-import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
-import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher;
-import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
-
 import androidx.fragment.app.Fragment;
 import androidx.leanback.app.RowsSupportFragment;
 import androidx.leanback.widget.ListRow;
 
+import org.jellyfin.androidtv.R;
+import org.jellyfin.androidtv.data.service.BackgroundService;
+import org.jellyfin.androidtv.databinding.FragmentSearchTextBinding;
+import org.jellyfin.androidtv.ui.browsing.CompositeSelectedListener;
+import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
+import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher;
+import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
+
+import kotlin.Lazy;
+
 public class TextSearchFragment extends Fragment implements TextWatcher, TextView.OnEditorActionListener {
+    protected CompositeSelectedListener mSelectedListener = new CompositeSelectedListener();
+
     private SearchProvider searchProvider;
+
+    private Lazy<BackgroundService> backgroundService = inject(BackgroundService.class);
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        searchProvider = new SearchProvider(getContext(), getActivity().getIntent().getBooleanExtra("MusicOnly", false));
+        searchProvider = new SearchProvider(getContext());
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_search_text, container, false);
+        return FragmentSearchTextBinding.inflate(inflater, container, false).getRoot();
     }
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
+
+        backgroundService.getValue().attach(requireActivity());
 
         // Add event listeners
         EditText searchBar = getActivity().findViewById(R.id.search_bar);
@@ -47,6 +60,16 @@ public class TextSearchFragment extends Fragment implements TextWatcher, TextVie
         // Set up result fragment
         RowsSupportFragment rowsSupportFragment = (RowsSupportFragment) getChildFragmentManager().findFragmentById(R.id.results_frame);
         rowsSupportFragment.setAdapter(searchProvider.getResultsAdapter());
+
+        rowsSupportFragment.setOnItemViewSelectedListener(mSelectedListener);
+        mSelectedListener.registerListener((itemViewHolder, item, rowViewHolder, row) -> {
+            if (!(item instanceof BaseRowItem)) {
+                backgroundService.getValue().clearBackgrounds();
+            } else {
+                BaseRowItem rowItem = (BaseRowItem) item;
+                backgroundService.getValue().setBackground(rowItem.getSearchHint());
+            }
+        });
 
         // Create click listener
         rowsSupportFragment.setOnItemViewClickedListener((itemViewHolder, item, rowViewHolder, row) -> {

@@ -5,6 +5,9 @@ import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import org.jellyfin.androidtv.TvApp
 import org.jellyfin.androidtv.ui.shared.BaseActivity
 
@@ -21,6 +24,13 @@ class PlaybackOverlayActivity : BaseActivity() {
 		// Note: Should NOT be applied to the decorView as this introduces artifacts
 		window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
+		// Hide system bars
+		WindowCompat.setDecorFitsSystemWindows(window, false)
+		WindowInsetsControllerCompat(window, findViewById(android.R.id.content)).apply {
+			hide(WindowInsetsCompat.Type.systemBars())
+			systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+		}
+
 		supportFragmentManager
 			.beginTransaction()
 			.replace(android.R.id.content, CustomPlaybackOverlayFragment())
@@ -33,7 +43,7 @@ class PlaybackOverlayActivity : BaseActivity() {
 			return true
 
 		if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
-			val frag = supportFragmentManager.fragments.get(0)
+			val frag = supportFragmentManager.fragments[0]
 			if (frag is CustomPlaybackOverlayFragment) {
 				frag.onKeyUp(keyCode, event)
 				return true
@@ -41,14 +51,14 @@ class PlaybackOverlayActivity : BaseActivity() {
 
 		}
 
-		val playbackController = TvApp.getApplication().playbackController
+		val playbackController = TvApp.getApplication()?.playbackController
 
 		when (keyCode) {
-			KeyEvent.KEYCODE_MEDIA_PLAY -> playbackController.play(0)
-			KeyEvent.KEYCODE_MEDIA_PAUSE -> playbackController.pause()
-			KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> playbackController.playPause()
-			KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_BUTTON_R2 -> playbackController.skip(30000)
-			KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_L2 -> playbackController.skip(-11000)
+			KeyEvent.KEYCODE_MEDIA_PLAY -> playbackController?.play(0)
+			KeyEvent.KEYCODE_MEDIA_PAUSE -> playbackController?.pause()
+			KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> playbackController?.playPause()
+			KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_BUTTON_R2 -> playbackController?.skip(30000)
+			KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_L2 -> playbackController?.skip(-11000)
 
 			// Use parent handler
 			else -> return super.onKeyUp(keyCode, event)
@@ -68,7 +78,7 @@ class PlaybackOverlayActivity : BaseActivity() {
 
 	override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
 		if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
-			val frag = supportFragmentManager.fragments.get(0)
+			val frag = supportFragmentManager.fragments[0]
 			if (frag is CustomPlaybackOverlayFragment) {
 				frag.onKeyLongPress(keyCode, event)
 				return true

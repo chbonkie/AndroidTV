@@ -13,8 +13,9 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import org.jellyfin.androidtv.R;
-import org.jellyfin.androidtv.util.TextUtilsKt;
+import org.jellyfin.androidtv.databinding.ItemRowBinding;
 import org.jellyfin.androidtv.util.TimeUtils;
+import org.jellyfin.androidtv.util.apiclient.BaseItemUtils;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
 
 public class ItemRowView extends FrameLayout {
@@ -63,14 +64,14 @@ public class ItemRowView extends FrameLayout {
 
     private void inflateView(Context context) {
         LayoutInflater inflater = LayoutInflater.from(context);
-        inflater.inflate(R.layout.item_row, this);
+        ItemRowBinding binding = ItemRowBinding.inflate(inflater, this, true);
         mContext = context;
-        mWholeRow = findViewById(R.id.wholeRow);
-        mIndexNo = findViewById(R.id.indexNo);
-        mItemName = findViewById(R.id.songName);
-        mExtraName = findViewById(R.id.artistName);
-        mRunTime = findViewById(R.id.runTime);
-        mWatchedMark = findViewById(R.id.watchedMark);
+        mWholeRow = binding.wholeRow;
+        mIndexNo = binding.indexNo;
+        mItemName = binding.songName;
+        mExtraName = binding.artistName;
+        mRunTime = binding.runTime;
+        mWatchedMark = binding.watchedMark;
         normalBackground = mWholeRow.getBackground();
         setFocusable(true);
     }
@@ -102,7 +103,7 @@ public class ItemRowView extends FrameLayout {
                 }
                 break;
             default:
-                String series = item.getSeriesName() != null ? item.getSeriesName() + " S" + item.getParentIndexNumber() + " E" + item.getIndexNumber() : null;
+                String series = item.getSeriesName() != null ? BaseItemUtils.getFullName(item, mContext) : null;
                 if (!TextUtils.isEmpty(series)) {
                     mItemName.setText(series);
                     mExtraName.setText(item.getName());
@@ -120,7 +121,7 @@ public class ItemRowView extends FrameLayout {
     public void updateWatched() {
         if (mBaseItem == null) return;
         if ("Video".equals(mBaseItem.getMediaType()) && mBaseItem.getUserData() != null && mBaseItem.getUserData().getPlayed()) {
-            mWatchedMark.setText(TextUtilsKt.toHtmlSpanned("&#x2713;"));
+            mWatchedMark.setText("✓");
         } else {
             mWatchedMark.setText("");
         }
@@ -158,11 +159,11 @@ public class ItemRowView extends FrameLayout {
         rowSelectedListener = listener;
     }
 
-    public static class RowSelectedListener {
-        public void onRowSelected(ItemRowView row) {};
+    public interface RowSelectedListener {
+        public void onRowSelected(ItemRowView row);
     }
 
-    public static class RowClickedListener {
-        public void onRowClicked(ItemRowView row) {};
+    public interface RowClickedListener {
+        public void onRowClicked(ItemRowView row);
     }
 }

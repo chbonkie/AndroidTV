@@ -1,5 +1,7 @@
 package org.jellyfin.androidtv.ui.livetv;
 
+import static org.koin.java.KoinJavaComponent.inject;
+
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -31,7 +33,8 @@ import com.bumptech.glide.Glide;
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.TvApp;
 import org.jellyfin.androidtv.constant.CustomMessage;
-import org.jellyfin.androidtv.data.model.LiveTvPrefs;
+import org.jellyfin.androidtv.data.model.DataRefreshService;
+import org.jellyfin.androidtv.preference.LiveTvPreferences;
 import org.jellyfin.androidtv.ui.FriendlyDateButton;
 import org.jellyfin.androidtv.ui.GuideChannelHeader;
 import org.jellyfin.androidtv.ui.GuidePagingButton;
@@ -42,7 +45,7 @@ import org.jellyfin.androidtv.ui.ObservableScrollView;
 import org.jellyfin.androidtv.ui.ProgramGridCell;
 import org.jellyfin.androidtv.ui.ScrollViewListener;
 import org.jellyfin.androidtv.ui.shared.BaseActivity;
-import org.jellyfin.androidtv.ui.shared.IMessageListener;
+import org.jellyfin.androidtv.ui.shared.MessageListener;
 import org.jellyfin.androidtv.util.ImageUtils;
 import org.jellyfin.androidtv.util.InfoLayoutHelper;
 import org.jellyfin.androidtv.util.TimeUtils;
@@ -54,6 +57,7 @@ import org.jellyfin.apiclient.interaction.Response;
 import org.jellyfin.apiclient.model.dto.BaseItemDto;
 import org.jellyfin.apiclient.model.dto.UserItemDataDto;
 import org.jellyfin.apiclient.model.livetv.ChannelInfoDto;
+import org.koin.java.KoinJavaComponent;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,15 +68,10 @@ import java.util.List;
 import kotlin.Lazy;
 import timber.log.Timber;
 
-import static org.koin.java.KoinJavaComponent.get;
-import static org.koin.java.KoinJavaComponent.inject;
-
-public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
-    public static final int ROW_HEIGHT = Utils.convertDpToPixel(TvApp.getApplication(),55);
-    public static final int PIXELS_PER_MINUTE = Utils.convertDpToPixel(TvApp.getApplication(),7);
-    private static final int IMAGE_SIZE = Utils.convertDpToPixel(TvApp.getApplication(), 150);
-    public static final int PAGEBUTTON_HEIGHT = Utils.convertDpToPixel(TvApp.getApplication(), 20);
-    public static final int PAGEBUTTON_WIDTH = 120 * PIXELS_PER_MINUTE;
+public class LiveTvGuideActivity extends BaseActivity implements LiveTvGuide {
+    public int ROW_HEIGHT;
+    public int PIXELS_PER_MINUTE;
+    public int PAGEBUTTON_HEIGHT;
     public static final int PAGE_SIZE = 75;
     public static final int NORMAL_HOURS = 9;
     public static final int FILTERED_HOURS = 4;
@@ -110,17 +109,21 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
     private int mCurrentDisplayChannelStartNdx = 0;
     private int mCurrentDisplayChannelEndNdx = 0;
     private long mLastFocusChanged;
-    private boolean mLoadLastChannel;
 
     private Handler mHandler = new Handler();
 
     private Lazy<ApiClient> apiClient = inject(ApiClient.class);
+    private Lazy<LiveTvPreferences> liveTvPreferences = inject(LiveTvPreferences.class);
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         mActivity = this;
+
+        ROW_HEIGHT = Utils.convertDpToPixel(this, 55);
+        PIXELS_PER_MINUTE = Utils.convertDpToPixel(this,7);
+        PAGEBUTTON_HEIGHT = Utils.convertDpToPixel(this, 20);
 
         setContentView(R.layout.live_tv_guide);
 
@@ -213,15 +216,12 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
         mChannelScroller.setFocusable(false);
 
         //Register to receive message from popup
-        registerMessageListener(new IMessageListener() {
+        registerMessageListener(new MessageListener() {
             @Override
             public void onMessageReceived(CustomMessage message) {
                 if (message.equals(CustomMessage.ActionComplete)) dismissProgramOptions();
             }
         });
-
-        //auto launch channel if indicated
-        mLoadLastChannel = getIntent().getBooleanExtra("loadLast", false);
     }
 
     private int getGuideHours() {
@@ -270,17 +270,7 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
     protected void onResume() {
         super.onResume();
 
-        if (mLoadLastChannel) {
-            mLoadLastChannel = false;
-            String channel = TvManager.getLastLiveTvChannel();
-            if (TvManager.getAllChannelsIndex(channel) != -1) {
-                PlaybackHelper.retrieveAndPlay(channel, false, this);
-            } else {
-                doLoad();
-            }
-        } else {
-            doLoad();
-        }
+        doLoad();
     }
 
     protected void doLoad() {
@@ -372,7 +362,6 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
                         && mSelectedProgram != null
                         && mSelectedProgram.getChannelId() != null) {
                     // tune to the current channel
-                    Utils.beep();
                     PlaybackHelper.retrieveAndPlay(mSelectedProgram.getChannelId(), false, this);
                     return true;
                 }
@@ -417,7 +406,8 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
                 public void onResponse(UserItemDataDto response) {
                     header.getChannel().setUserData(response);
                     header.findViewById(R.id.favImage).setVisibility(response.getIsFavorite() ? View.VISIBLE : View.GONE);
-                    TvApp.getApplication().dataRefreshService.setLastFavoriteUpdate(System.currentTimeMillis());
+                    DataRefreshService dataRefreshService = KoinJavaComponent.<DataRefreshService>get(DataRefreshService.class);
+                    dataRefreshService.setLastFavoriteUpdate(System.currentTimeMillis());
                 }
             });
         }
@@ -474,10 +464,6 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
 
     private FilterPopup mFilterPopup;
     class FilterPopup {
-
-        final int WIDTH = Utils.convertDpToPixel(TvApp.getApplication(), 250);
-        final int HEIGHT = Utils.convertDpToPixel(TvApp.getApplication(), 400);
-
         PopupWindow mPopup;
         LiveTvGuideActivity mActivity;
         CheckBox mMovies;
@@ -494,11 +480,13 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
             mActivity = activity;
             LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
             View layout = inflater.inflate(R.layout.guide_filter_popup, null);
-            mPopup = new PopupWindow(layout, WIDTH, HEIGHT);
+            int popupWidth = Utils.convertDpToPixel(activity, 250);
+            int popupHeight = Utils.convertDpToPixel(activity, 400);
+            mPopup = new PopupWindow(layout, popupWidth, popupHeight);
             mPopup.setFocusable(true);
             mPopup.setOutsideTouchable(true);
             mPopup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT)); // necessary for popup to dismiss
-            mPopup.setAnimationStyle(R.style.PopupSlideInRight);
+            mPopup.setAnimationStyle(R.style.WindowAnimation_SlideRight);
             mMovies = layout.findViewById(R.id.movies);
             mSeries = layout.findViewById(R.id.series);
             mNews = layout.findViewById(R.id.news);
@@ -557,10 +545,6 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
 
     private OptionsPopup mOptionsPopup;
     class OptionsPopup {
-
-        final int WIDTH = Utils.convertDpToPixel(TvApp.getApplication(), 300);
-        final int HEIGHT = Utils.convertDpToPixel(TvApp.getApplication(), 460);
-
         PopupWindow mPopup;
         LiveTvGuideActivity mActivity;
         CheckBox mHd;
@@ -580,11 +564,13 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
             mActivity = activity;
             LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
             View layout = inflater.inflate(R.layout.guide_options_popup, null);
-            mPopup = new PopupWindow(layout, WIDTH, HEIGHT);
+            int popupWidth = Utils.convertDpToPixel(activity, 300);
+            int popupHeight = Utils.convertDpToPixel(activity, 460);
+            mPopup = new PopupWindow(layout, popupWidth, popupHeight);
             mPopup.setFocusable(true);
             mPopup.setOutsideTouchable(true);
             mPopup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT)); // necessary for popup to dismiss
-            mPopup.setAnimationStyle(R.style.PopupSlideInRight);
+            mPopup.setAnimationStyle(R.style.WindowAnimation_SlideRight);
             mHd = layout.findViewById(R.id.hd);
             mRepeat = layout.findViewById(R.id.repeat);
             mLive = layout.findViewById(R.id.live);
@@ -598,17 +584,19 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
             mSaveButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    LiveTvPrefs prefs = TvManager.getPrefs();
-                    prefs.showHDIndicator = mHd.isChecked();
-                    prefs.showPremiereIndicator = mPremiere.isChecked();
-                    prefs.showNewIndicator = mNew.isChecked();
-                    prefs.favsAtTop = mFavTop.isChecked();
-                    prefs.colorCodeGuide = mColorCode.isChecked();
-                    prefs.showRepeatIndicator = mRepeat.isChecked();
-                    prefs.channelOrder = mCurrentSort;
-                    prefs.showLiveIndicator = mLive.isChecked();
+                    LiveTvPreferences prefs = liveTvPreferences.getValue();
 
-                    TvManager.updatePrefs(prefs);
+                    prefs.set(LiveTvPreferences.Companion.getShowHDIndicator(), mHd.isChecked());
+                    prefs.set(LiveTvPreferences.Companion.getShowPremiereIndicator(), mPremiere.isChecked());
+                    prefs.set(LiveTvPreferences.Companion.getShowNewIndicator(), mNew.isChecked());
+                    prefs.set(LiveTvPreferences.Companion.getFavsAtTop(), mFavTop.isChecked());
+                    prefs.set(LiveTvPreferences.Companion.getColorCodeGuide(), mColorCode.isChecked());
+                    prefs.set(LiveTvPreferences.Companion.getShowRepeatIndicator(), mRepeat.isChecked());
+                    prefs.set(LiveTvPreferences.Companion.getChannelOrder(), mCurrentSort);
+                    prefs.set(LiveTvPreferences.Companion.getShowLiveIndicator(), mLive.isChecked());
+                    prefs.commitBlocking();
+
+                    TvManager.clearCache();
 
                     load();
                     mPopup.dismiss();
@@ -643,17 +631,17 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
         }
 
         public void show() {
-            LiveTvPrefs prefs = TvManager.getPrefs();
+            LiveTvPreferences prefs = liveTvPreferences.getValue();
 
-            mHd.setChecked(prefs.showHDIndicator);
-            mRepeat.setChecked(prefs.showRepeatIndicator);
-            mLive.setChecked(prefs.showLiveIndicator);
-            mFavTop.setChecked(prefs.favsAtTop);
-            mNew.setChecked(prefs.showNewIndicator);
-            mRepeat.setChecked(prefs.showRepeatIndicator);
-            mColorCode.setChecked(prefs.colorCodeGuide);
-            mPremiere.setChecked(prefs.showPremiereIndicator);
-            mSortBy.setSelection(prefs.channelOrder.equals("DatePlayed") ? 0 : 1);
+            mHd.setChecked(prefs.get(LiveTvPreferences.Companion.getShowHDIndicator()));
+            mRepeat.setChecked(prefs.get(LiveTvPreferences.Companion.getShowRepeatIndicator()));
+            mLive.setChecked(prefs.get(LiveTvPreferences.Companion.getShowLiveIndicator()));
+            mFavTop.setChecked(prefs.get(LiveTvPreferences.Companion.getFavsAtTop()));
+            mNew.setChecked(prefs.get(LiveTvPreferences.Companion.getShowNewIndicator()));
+            mRepeat.setChecked(prefs.get(LiveTvPreferences.Companion.getShowRepeatIndicator()));
+            mColorCode.setChecked(prefs.get(LiveTvPreferences.Companion.getColorCodeGuide()));
+            mPremiere.setChecked(prefs.get(LiveTvPreferences.Companion.getShowPremiereIndicator()));
+            mSortBy.setSelection(prefs.get(LiveTvPreferences.Companion.getChannelOrder()).equals("DatePlayed") ? 0 : 1);
 
             mPopup.showAtLocation(mTimelineScroller, Gravity.NO_GRAVITY, mTimelineScroller.getRight(), mSummary.getTop()-20);
         }
@@ -757,7 +745,7 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
                 }
 
                 TextView placeHolder = new TextView(mActivity);
-                placeHolder.setHeight(LiveTvGuideActivity.PAGEBUTTON_HEIGHT);
+                placeHolder.setHeight(PAGEBUTTON_HEIGHT);
                 mChannels.addView(placeHolder);
                 displayedChannels = 0;
 
@@ -953,7 +941,7 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
         mCurrentGuideStart.set(Calendar.MILLISECOND, 0);
         mCurrentLocalGuideStart = mCurrentGuideStart.getTimeInMillis();
 
-        mDisplayDate.setText(TimeUtils.getFriendlyDate(mCurrentGuideStart.getTime()));
+        mDisplayDate.setText(TimeUtils.getFriendlyDate(this, mCurrentGuideStart.getTime()));
         Calendar current = (Calendar) mCurrentGuideStart.clone();
         mCurrentGuideEnd = (Calendar) mCurrentGuideStart.clone();
         int oneHour = 60 * PIXELS_PER_MINUTE;
@@ -980,7 +968,7 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
         @Override
         public void run() {
             if (mSelectedProgram.getOverview() == null && mSelectedProgram.getId() != null) {
-                get(ApiClient.class).GetItemAsync(mSelectedProgram.getId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
+                KoinJavaComponent.<ApiClient>get(ApiClient.class).GetItemAsync(mSelectedProgram.getId(), TvApp.getApplication().getCurrentUser().getId(), new Response<BaseItemDto>() {
                     @Override
                     public void onResponse(BaseItemDto response) {
                         mSelectedProgram = response;
@@ -1009,9 +997,14 @@ public class LiveTvGuideActivity extends BaseActivity implements ILiveTvGuide {
         InfoLayoutHelper.addInfoRow(mActivity, mSelectedProgram, mInfoRow, false, false);
 
         if (mSelectedProgram.getId() != null) {
-            mDisplayDate.setText(TimeUtils.getFriendlyDate(TimeUtils.convertToLocalDate(mSelectedProgram.getStartDate())));
-            String url = ImageUtils.getPrimaryImageUrl(mSelectedProgram, get(ApiClient.class));
-            Glide.with(mActivity).load(url).override(IMAGE_SIZE, IMAGE_SIZE).centerInside().into(mImage);
+            mDisplayDate.setText(TimeUtils.getFriendlyDate(this, TimeUtils.convertToLocalDate(mSelectedProgram.getStartDate())));
+            String url = ImageUtils.getPrimaryImageUrl(mSelectedProgram);
+            int imageSize = Utils.convertDpToPixel(this, 150);
+            Glide.with(mActivity)
+                    .load(url)
+                    .override(imageSize, imageSize)
+                    .centerInside()
+                    .into(mImage);
 
             if (Utils.isTrue(mSelectedProgram.getIsNews())) {
                 mBackdrop.setImageResource(R.drawable.banner_news);

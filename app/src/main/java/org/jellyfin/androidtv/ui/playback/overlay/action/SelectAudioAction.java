@@ -11,12 +11,10 @@ import org.jellyfin.androidtv.ui.playback.PlaybackController;
 import org.jellyfin.androidtv.ui.playback.PlaybackManager;
 import org.jellyfin.androidtv.ui.playback.overlay.CustomPlaybackTransportControlGlue;
 import org.jellyfin.androidtv.ui.playback.overlay.LeanbackOverlayFragment;
-import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.apiclient.model.entities.MediaStream;
+import org.koin.java.KoinJavaComponent;
 
 import java.util.List;
-
-import static org.koin.java.KoinJavaComponent.get;
 
 public class SelectAudioAction extends CustomAction {
 
@@ -28,17 +26,13 @@ public class SelectAudioAction extends CustomAction {
     @Override
     public void handleClickAction(PlaybackController playbackController, LeanbackOverlayFragment leanbackOverlayFragment, Context context, View view) {
 
-        List<MediaStream> audioTracks = get(PlaybackManager.class).getInPlaybackSelectableAudioStreams(playbackController.getCurrentStreamInfo());
-        Integer currentAudioIndex = playbackController.getAudioStreamIndex();
-        if (!playbackController.isNativeMode() && currentAudioIndex > audioTracks.size()) {
-            //VLC has translated this to an ID - we need to translate back to our index positionally
-            currentAudioIndex = playbackController.translateVlcAudioId(currentAudioIndex);
-        }
+        List<MediaStream> audioTracks = KoinJavaComponent.<PlaybackManager>get(PlaybackManager.class).getInPlaybackSelectableAudioStreams(playbackController.getCurrentStreamInfo());
+        int currentAudioIndex = playbackController.getAudioStreamIndex();
 
-        PopupMenu audioMenu = Utils.createPopupMenu(context, view, Gravity.END);
+        PopupMenu audioMenu = new PopupMenu(context, view, Gravity.END);
         for (MediaStream audio : audioTracks) {
             MenuItem item = audioMenu.getMenu().add(0, audio.getIndex(), audio.getIndex(), audio.getDisplayTitle());
-            if (currentAudioIndex != null && currentAudioIndex == audio.getIndex())
+            if (currentAudioIndex == audio.getIndex())
                 item.setChecked(true);
         }
         audioMenu.getMenu().setGroupCheckable(0, true, false);
