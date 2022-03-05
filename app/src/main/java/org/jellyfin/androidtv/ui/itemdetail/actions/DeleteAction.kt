@@ -14,7 +14,7 @@ import org.jellyfin.androidtv.data.itemtypes.BaseItem
 import org.jellyfin.androidtv.util.DelayedMessage
 import org.jellyfin.apiclient.interaction.ApiClient
 import org.jellyfin.apiclient.interaction.EmptyResponse
-import org.koin.core.get
+import org.koin.core.component.get
 import timber.log.Timber
 
 class DeleteAction(private val context: Context, private val item: LiveData<out BaseItem>, private val onItemDeleted: () -> Unit) : Action {

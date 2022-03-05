@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.leanback.widget.Presenter
-import kotlinx.android.synthetic.main.list_item_song.view.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -18,8 +17,8 @@ import org.jellyfin.androidtv.util.Utils
 import org.jellyfin.androidtv.util.apiclient.PlaybackHelper
 import org.jellyfin.androidtv.util.apiclient.getItem
 import org.jellyfin.apiclient.interaction.ApiClient
-import org.koin.core.KoinComponent
-import org.koin.core.get
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 
 class SongPresenter : Presenter(), KoinComponent {
 	override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {

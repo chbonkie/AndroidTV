@@ -4,7 +4,6 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.FrameLayout
-import kotlinx.android.synthetic.main.badge_watched.view.*
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.itemtypes.PlayableItem
 

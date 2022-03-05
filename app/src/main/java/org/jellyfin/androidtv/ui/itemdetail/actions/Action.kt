@@ -3,7 +3,7 @@ package org.jellyfin.androidtv.ui.itemdetail.actions
 import android.graphics.drawable.Drawable
 import android.view.View
 import androidx.lifecycle.LiveData
-import org.koin.core.KoinComponent
+import org.koin.core.component.KoinComponent
 
 interface Action : KoinComponent {
 	val visible: LiveData<Boolean>

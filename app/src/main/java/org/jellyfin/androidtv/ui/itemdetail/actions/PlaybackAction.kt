@@ -15,7 +15,7 @@ import org.jellyfin.androidtv.util.apiclient.getItem
 import org.jellyfin.apiclient.interaction.ApiClient
 import org.jellyfin.apiclient.interaction.Response
 import org.jellyfin.apiclient.model.dto.BaseItemDto
-import org.koin.core.get
+import org.koin.core.component.get
 
 private const val LOG_TAG = "PlaybackAction"
 

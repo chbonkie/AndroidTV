@@ -9,7 +9,7 @@ import org.jellyfin.androidtv.data.itemtypes.BaseItem
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.util.apiclient.getItem
 import org.jellyfin.apiclient.interaction.ApiClient
-import org.koin.core.get
+import org.koin.core.component.get
 
 private const val LOG_TAG = "AddToQueueAction"
 

@@ -14,7 +14,6 @@ import androidx.core.text.bold
 import androidx.leanback.widget.RowPresenter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import kotlinx.android.synthetic.main.row_details_description.view.*
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.itemtypes.Episode
 import org.jellyfin.androidtv.data.itemtypes.Movie

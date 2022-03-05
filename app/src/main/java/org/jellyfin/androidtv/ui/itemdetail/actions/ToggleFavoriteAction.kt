@@ -11,7 +11,7 @@ import org.jellyfin.androidtv.TvApp
 import org.jellyfin.androidtv.data.itemtypes.BaseItem
 import org.jellyfin.androidtv.util.apiclient.updateFavoriteStatus
 import org.jellyfin.apiclient.interaction.ApiClient
-import org.koin.core.get
+import org.koin.core.component.get
 
 class ToggleFavoriteAction(val context: Context, val item: MutableLiveData<out BaseItem>) : ToggleableAction {
 	override val visible: LiveData<Boolean> = MutableLiveData(true)

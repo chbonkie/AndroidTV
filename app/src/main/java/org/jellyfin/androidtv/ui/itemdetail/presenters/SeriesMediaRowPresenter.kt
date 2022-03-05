@@ -11,8 +11,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.leanback.widget.RowPresenter
 import androidx.recyclerview.widget.RecyclerView
-import kotlinx.android.synthetic.main.row_details_series_media.view.*
-import kotlinx.android.synthetic.main.row_details_series_media_item.view.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch

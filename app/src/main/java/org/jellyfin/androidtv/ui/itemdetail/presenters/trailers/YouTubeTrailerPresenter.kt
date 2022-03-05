@@ -4,7 +4,6 @@ import android.content.Context
 import android.view.ViewGroup
 import androidx.appcompat.view.ContextThemeWrapper
 import com.bumptech.glide.Glide
-import kotlinx.android.synthetic.main.multi_badge_image_card_view.view.*
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.trailers.external.YouTubeTrailer
 import org.jellyfin.androidtv.ui.MultiBadgeImageCardView

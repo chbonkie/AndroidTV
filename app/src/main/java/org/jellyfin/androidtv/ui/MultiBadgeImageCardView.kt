@@ -8,7 +8,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.leanback.widget.BaseCardView
-import kotlinx.android.synthetic.main.multi_badge_image_card_view.view.*
 import org.jellyfin.androidtv.R
 
 class MultiBadgeImageCardView(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : BaseCardView(context, attrs, defStyleAttr) {

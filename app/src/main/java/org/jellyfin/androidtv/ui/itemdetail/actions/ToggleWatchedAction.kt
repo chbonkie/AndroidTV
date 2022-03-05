@@ -10,7 +10,7 @@ import org.jellyfin.androidtv.data.itemtypes.PlayableItem
 import org.jellyfin.androidtv.util.apiclient.markPlayed
 import org.jellyfin.androidtv.util.apiclient.markUnplayed
 import org.jellyfin.apiclient.interaction.ApiClient
-import org.koin.core.get
+import org.koin.core.component.get
 
 class ToggleWatchedAction(context: Context, val item: MutableLiveData<out PlayableItem>) : ToggleableAction {
 	override val visible = MutableLiveData(true)

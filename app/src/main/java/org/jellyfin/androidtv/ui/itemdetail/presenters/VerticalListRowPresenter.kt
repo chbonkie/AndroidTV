@@ -6,7 +6,6 @@ import android.view.ViewGroup
 import androidx.leanback.widget.ItemBridgeAdapter
 import androidx.leanback.widget.RowPresenter
 import androidx.recyclerview.widget.LinearLayoutManager
-import kotlinx.android.synthetic.main.row_vertical_list.view.*
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.itemdetail.rows.VerticalListRow
 

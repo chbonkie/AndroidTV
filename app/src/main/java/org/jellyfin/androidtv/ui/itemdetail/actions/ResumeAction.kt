@@ -9,7 +9,7 @@ import androidx.lifecycle.MutableLiveData
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.itemtypes.PlayableItem
 import org.jellyfin.androidtv.preference.UserPreferences
-import org.koin.core.get
+import org.koin.core.component.get
 
 private const val LOG_TAG = "ResumeAction"
 

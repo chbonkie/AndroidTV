@@ -21,8 +21,8 @@ import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.androidtv.util.apiclient.getItem
 import org.jellyfin.androidtv.util.dp
 import org.jellyfin.apiclient.interaction.ApiClient
-import org.koin.core.KoinComponent
-import org.koin.core.get
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 
 class ChapterInfoPresenter(private val context: Context) : Presenter(), IItemClickListener, KoinComponent {
 
